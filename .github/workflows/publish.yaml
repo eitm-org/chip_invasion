@@ -33,5 +33,5 @@ jobs:
 
     - name: Build the chip_invasion Docker image
       run: |
-        docker build . --tag ghcr.io/eltonelizabeth/chip_invasion:latest
-        docker push ghcr.io/eltonelizabeth/chip_invasion:latest
+        docker build . --tag ghcr.io/eitm-org/chip_invasion:latest
+        docker push ghcr.io/eitm-org/chip_invasion:latest
