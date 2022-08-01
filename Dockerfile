@@ -20,10 +20,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # basic shiny functionality
-RUN R -q -e "install.packages(c('shiny', 'rmarkdown'))"
+RUN R -q -e "install.packages(c('shiny', 'rmarkdown', 'bslib'))"
 
 # install dependencies of the example app
-RUN R -q -e "install.packages('Rmpfr')"
+RUN R -q -e "install.packages(c('tidyverse', 'here', 'janitor', 'readxl', 'hablar', 'ggbeeswarm', 'plotly', 'FactoMineR', 'factoextra'))"
 
 # copy the app to the image
 RUN mkdir /root/chip_invasion
