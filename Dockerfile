@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     libssl-dev \
     libssh2-1-dev \
     libssl1.1 \
+    libxml2 \
     && rm -rf /var/lib/apt/lists/*
 
 # system library dependency for the example app
@@ -23,7 +24,7 @@ RUN apt-get update && apt-get install -y \
 RUN R -q -e "install.packages(c('shiny', 'rmarkdown', 'bslib'))"
 
 # install dependencies of the example app
-RUN R -q -e "install.packages(c('tidyverse', 'here', 'janitor', 'readxl', 'hablar', 'ggbeeswarm', 'plotly', 'FactoMineR', 'factoextra','xml2',dependencies = TRUE))"
+RUN R -q -e "install.packages(c('tidyverse', 'here', 'janitor', 'readxl', 'hablar', 'ggbeeswarm', 'plotly', 'FactoMineR', 'factoextra','xml2'))"
 
 # copy the app to the image
 RUN mkdir /root/chip_invasion
