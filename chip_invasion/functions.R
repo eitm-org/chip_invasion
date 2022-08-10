@@ -15,7 +15,7 @@ endothelial_epithelial_reader <- function(data_path) {
   require(readxl)
   require(dplyr)
   huvec_xl <- read_xlsx(file.path(data_path), sheet = c("Endothelial"), skip = 9) %>%
-    mutate(Chip = as.double(str_extract(Compound, pattern = "(?<=chip)\\d*|(?<=Chip)\\s\\d*")))
+    mutate(Chip = as.double(str_extract(Compound, pattern = "(?<=chip)\\d*|(?<=Chip)\\s\\d*|(?<=Chip)\\d*")))
   
   huvec_xl <- huvec_xl %>% janitor::clean_names() %>%
     rename_with(~str_remove(.x, "_mm")) %>%
@@ -23,7 +23,7 @@ endothelial_epithelial_reader <- function(data_path) {
     rename_with(~str_remove(.x, "\\d$"))
   
   gfp_xl <- read_xlsx(file.path(data_path), sheet = c("Epithelial"), skip = 9) %>%
-    mutate(Chip = as.double(str_extract(Compound, pattern = "(?<=chip)\\d*|(?<=Chip)\\s\\d*"))) 
+    mutate(Chip = as.double(str_extract(Compound, pattern = "(?<=chip)\\d*|(?<=Chip)\\s\\d*|(?<=Chip)\\d*"))) 
   
   #cell_type <- "organoid"
   if("488 SPSB Nuclei Selected - 488 SPSB Nucleus Centroid Z [µm]" %in% colnames(gfp_xl)){

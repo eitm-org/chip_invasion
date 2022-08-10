@@ -13,7 +13,7 @@ shinyUI(fluidPage(
       tags$hr(style="color:#8B1462;"),
       tags$b("Background"),
       # tags$br(),
-      tags$p("The CRC colon cancer on a chip is used a contained environment that can be used to study invasion of cells from the top channel to the bottom channel. 
+      tags$p("The CRC on a chip model is a contained environment that can be used to study invasion of cells from the top channel to the bottom channel. 
               To study the amount of invasion from the top to the bottom channel, the border between them needs to be defined and anything below that can be counted as the bottom channel.
               Additional noise must be filtered out."),
       #tags$br(),
@@ -21,7 +21,7 @@ shinyUI(fluidPage(
       tags$p("The chips don't always sit level on the mount and one z height can't be taken across the chip to use as a border to delineate top and bottom. 
               Cells that are on the bottom of the top channel can me mistakenly counted as being in the bottom channel. 
               Endothelial cells (such as HUVECS or HIMECS) can be used as a marker for the border since they line the bottom channel.
-              When the inclusion criteria in the imaging software was lowered, low-intensity noise and rouge pores could be included in the counts.
+              When the inclusion criteria in the imaging software was broadened, low-intensity noise and dead cells could be included in the counts.
               Intensity and PCA distribution values can be used to filter out these populations."),
       #tags$br(),
       tags$b("Objective"),
