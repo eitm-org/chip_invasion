@@ -1,0 +1,465 @@
+---
+title: "x-field_sandbox"
+author: "Elizabeth Elton"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(here)
+library(janitor)
+library(readxl)
+library(hablar)
+library(ggbeeswarm)
+library(plotly)
+library(FactoMineR)
+library(factoextra)
+cwd <- here::here()
+
+library(fields)
+library(bigsplines)
+#library(plot3D)
+
+source('chip_invasion/functions.R', local = TRUE)
+```
+
+#read in data using normal functions
+#find xmin and xmax
+#divide into fields
+#label xy fields -- change to letters? or it can be like 1_1, 1_2, etc
+#change endo boundary calc to be grouped by xy fields
+#get counts
+#compare to ground truth -- ask carly/rachel for this
+
+#hct data -- read in using normal fxns
+#get colnames/order
+#build in rearranger to make colnames the order i want
+
+```{r}
+diagnostic_plots_ee <- function(huvec_df, organoid_df) {
+  huvec_plot <- ggplot(huvec_df, aes(x = centroid_z)) +
+    geom_histogram() +
+    facet_wrap(~ chip) +
+    geom_vline(xintercept = mean(huvec_df$centroid_z))+
+    labs(title = "Endothelial cells at each z position")
+  
+  organoid_plot <- ggplot(organoid_df, aes(x = centroid_z))  +
+    geom_histogram() +
+    facet_wrap(~ chip) +
+    labs(title = "Epithelial cells at each z position")
+  
+  print(huvec_plot)
+  print(organoid_plot)
+}
+```
+
+
+
+```{r}
+test_us <- endothelial_epithelial_reader("/Users/eelton/Dropbox (EITM)/CLS Files Share with Elizabeth 2023/US-GFP Organoids CLS Analysis/20230219exp_D6_Chip1-6_invasion_US-GFP ORGS.xlsx")
+diagnostic_plots_ee(huvec_df = test_us$huvec_df, test_us$organoid_df)
+```
+
+
+```{r}
+meantest <- test_us$huvec_df %>%
+  group_by(chip) %>%
+  summarise(xint = mean(centroid_z))
+
+huvec_df <- test_us$huvec_df
+
+ggplot(huvec_df, aes(x=position_x, y=centroid_z)) +
+  geom_point() +
+  facet_wrap(~ chip)
+
+#lets start w one chip
+chip1 <- huvec_df %>%
+  filter(chip == 1)
+
+ggplot(chip1, aes(x=position_x, y=position_y)) +
+  geom_point(aes(color=centroid_z)) +
+  geom_vline(xintercept = widthlist$xfield_bounds)
+#cool field assignment is working
+
+ggplot(chip1, aes(x=position_x)) +
+  geom_histogram(binwidth = 1)
+```
+
+
+```{r}
+chip1_xmin <- min(chip1$position_x)
+chip1_xmax <- max(chip1$position_x)
+chip1_xfield_size <- (chip1_xmax-chip1_xmin)/10
+widthlist <- list()
+for (f in 0:10){
+  xfieldbound <- chip1_xmax - (f*chip1_xfield_size)
+  
+  widthlist <- append(widthlist, xfieldbound)
+} #these are the xfield boundaries
+
+widthlist <- as.data.frame(widthlist) %>%
+  pivot_longer(cols = 1:11, names_to = "idc", values_to = "xfield_bounds")
+
+chip1 <- chip1 %>%
+  mutate(xfield = case_when(widthlist$xfield_bounds[2] <= position_x ~ 10,
+                            widthlist$xfield_bounds[3] <= position_x & position_x <= widthlist$xfield_bounds[2] ~ 9,
+                            widthlist$xfield_bounds[4] <= position_x & position_x <= widthlist$xfield_bounds[3] ~ 8,
+                            widthlist$xfield_bounds[5] <= position_x & position_x <= widthlist$xfield_bounds[4] ~ 7,
+                            widthlist$xfield_bounds[6] <= position_x & position_x <= widthlist$xfield_bounds[5] ~ 6,
+                            widthlist$xfield_bounds[7] <= position_x & position_x <= widthlist$xfield_bounds[6] ~ 5,
+                            widthlist$xfield_bounds[8] <= position_x & position_x <= widthlist$xfield_bounds[7] ~ 4,
+                            widthlist$xfield_bounds[9] <= position_x & position_x <= widthlist$xfield_bounds[8] ~ 3,
+                            widthlist$xfield_bounds[10] <= position_x & position_x <= widthlist$xfield_bounds[9] ~ 2,
+                            position_x <= widthlist$xfield_bounds[10] ~ 1),
+         xfield = as.character(xfield),
+         yfield = as.character(field))
+#there is for sure a better way to do this  
+#cool now i have field assign,ent, now 
+
+```
+
+```{r}
+#trying tps!
+#silly test - trying a 2d example. i am concerned by the time this is taking
+#fit <- fastTps(chip1$position_x, chip1$position_y, aRange = 3)
+
+fit <- fastTps(x=chip1[, c("position_x", "position_y")], Y=chip1$centroid_z, aRange = 200)
+fit_100 <- fastTps(x=chip1[, c("position_x", "position_y")], Y=chip1$centroid_z, aRange = 100)
+
+#fit_centroid <- fastTps(x=chip1[, c("centroid_x_in_image", "centroid_y_in_image")], Y=chip1$centroid_z, aRange = 200)
+#set.panel(2,2)
+plot(fit)
+#set.panel()
+
+summary(fit)
+
+surface(fit)
+#!!!
+#stick with fasttps for now, see if i can get it to work w predict
+summary(fit_100)
+surface(fit_100)
+
+```
+```{r}
+surface(fit)
+```
+
+
+
+```{r}
+#try predicsurface from fields -- use grid of values from??
+
+#fit.pred <- predictSurface(fit)
+#summary(fit.pred)
+fit.pred <- predict(fit)
+summary(fit.pred)
+#surface(fit)
+```
+
+```{r}
+quilt.plot(x=chip1$position_x, y=chip1$position_y, z=chip1$centroid_z)
+#oh this is kind of a cool visual
+```
+```{r}
+grid.list <- list(x=seq(min(chip1$position_x), max(chip1$position_x)), y=seq(min(chip1$position_y), max(chip1$position_y)))
+grid.list <- list(x=seq(1,65), y=seq(1,66.04615))
+dat <- as.matrix(chip1$centroid_z, nr=65, nc=65)
+
+full.grid <- make.surface.grid(grid.list = grid.list)
+new.fit <- spatialProcess(x=chip1[, c("position_x", "position_y")], y=chip1$centroid_z) #takes forever dont do this
+
+summary(new.fit)
+```
+
+
+```{r}
+surface(new.fit) #that looks so cool but took so long
+```
+
+
+```{r}
+xa.2 <- seq(0, max(chip1$position_x), len = 100) #xposition -- of org data?? what data do i want here -- start w huvec just to see
+xb.2 <- seq(0, max(chip1$position_y), len = 100) #yposition
+data250 <- expand.grid(x=xa.2, y=xb.2) #make big grid -- try field built in?
+fitted.add1215 <- matrix(predict(fit, data250), 100, 100) #compare fit to grid
+
+#grid.list <- list(x=seq(0, max(chip1$position_x), len = 1000), y=seq(0, max(chip1$position_y), len = 1000))
+#full.grid <- make.surface.grid(grid.list = grid.list)
+
+#fitted.add1215 <- matrix(predict(fit, full.grid), 1000, 1000)
+#ok dont use their make.surface.grid fxn
+#3d plot
+#open3d()
+# material3d(col="black")
+#persp3d(z = fitted.add1215, contour = TRUE, theta = 70, phi=30, ticktype="detailed", xlab=drugA, ylab=drugB,  zlab="Viability", nlevels = 3, col= viridis(1000), main = 'Simulated Additive LIM1215')
+
+fig <- plot_ly(z = fitted.add1215) %>% add_surface()
+
+fig
+```
+
+
+```{r}
+chip1_gfps <- test_us$organoid_df %>%
+  filter(chip==1) %>%
+  select(position_x, position_y)
+
+#make a list by chip 
+#run lappy
+#unlist and cbind (rbind and cbind)
+
+#predict(model, (xcords, ycords))
+gfp_pred <- predict(fit, chip1_gfps)
+#i mean cool
+#so now we try it as mutate and compare
+
+chip_gfp_comp <- test_us$organoid_df %>%
+  filter(chip==1)
+  #mutate(predicted_z = predict(fit, c(position_x, position_y)),
+   #      below_pred = centroid_z < predicted_z)
+#oh i dont think i can mutate
+
+chip_gfp_comp <- cbind(chip_gfp_comp, gfp_pred) %>%
+  mutate(below_pred = centroid_z < gfp_pred)
+#sure
+chip_gfp_bottom <- chip_gfp_comp %>%
+  filter(below_pred == TRUE)
+#that seems like a lot #because it is all chips!!! not just chip 1!!! im silly
+#ok but i havent filtered by intensity, pca yet
+
+ggplot(chip_gfp_bottom) +
+  geom_point(aes(x=position_x, y=centroid_z))
+#oh cool!!! 38 seems reasonable maybe
+#see what it looks like when i use the app
+#and when i run intensity and pca filters on this
+
+plot_ly(x=chip_gfp_bottom$position_x, y=chip_gfp_bottom$position_y, z=chip_gfp_bottom$centroid_z)
+```
+
+```{r}
+ggplot(chip_gfp_bottom, aes(x = position_x, y = position_y)) + geom_point() + labs(title = "XY Position Plot")
+ggplot(chip_gfp_bottom, aes(x=position_x, y=centroid_z)) + geom_point() + labs(title = "XZ Position Plot")
+```
+
+
+
+```{r}
+intensity_test <- org_intensity_filtering(chip_gfp_bottom)
+high_int_test <- intensity_test$gfp_high_intensity #down to 19
+
+#cleanpcatest <- ee_invasion_pcar(intensity_test$gfp_high_intensity) #hmmmm figure this out later !!!!!
+
+cleanpcatest  <- intensity_test$gfp_high_intensity %>%
+    select(-(5:8), -(11:17), -(19:27), -(37:39), -(44:46)) %>% #select relevant cols
+    mutate(chip = as_factor(chip), field = as_factor(field)) 
+
+#pcamatrixtest <- ee_invasion_pcar(cleanpcatest)
+
+nointensity.pca <- cleanpcatest %>%
+    mutate_if(is.numeric, scale) %>%
+    PCA(quanti.sup = c(1:3, 5:7, 19), quali.sup = c(4, 20:21), graph = FALSE)
+
+invasion_pcar_graphs(nointensity.pca, cleanpcatest)
+
+pcafilttest <- pcar_density_filter(cleanpcatest, nointensity.pca)
+pcafilttest$pca_filtered_df #still 19
+
+
+pcaclean <- ee_clean_for_pca(intfilt$gfp_high_intensity)
+
+pcamatrix <- ee_invasion_pcar(pcaclean)
+
+invasion_pcar_graphs(pcamatrix, pcaclean)
+
+pcafiltered <- pcar_density_filter(pcaclean, pcamatrix)
+
+per_chip_counter_ee(pcafiltered$pca_filtered_df)
+```
+
+
+
+```{r}
+# fit_better <- bigtps(x=chip1[, c("position_x", "position_y")], y=chip1$centroid_z)
+# summary(fit_better)
+# imagebar(x=fit_better$x[,1], y=fit_better$x[,2], z=fit_better$fitted.values)
+# surface(fit_better)
+#persp3d or surf 3d
+#x=arranged xinput
+#y
+```
+
+```{r}
+#runing thru the normal pipeline
+
+step1 <- endothelial_epithelial_reader("/Users/eelton/Dropbox (EITM)/CLS Files Share with Elizabeth 2023/US-GFP Organoids CLS Analysis/20230219exp_D6_Chip1-6_invasion_US-GFP ORGS.xlsx")
+endobound <- endo_boundary(step1$huvec_df, step1$cell_type)
+firstcounts <- epi_count(step1$organoid_df, endobound$field_chip_huvec)
+firstcounts$gfp_per_chip_bottom #47 pre int,pca #hmm i would have expected this to be lower
+
+chip_3d_plot_ee(firstcounts$all_gfp_bottom, chip_in = 1)
+position_chip_plots_xy(firstcounts$all_gfp_bottom)
+position_chip_plots_xz(firstcounts$all_gfp_bottom)
+```
+
+
+```{r}
+intfilt <-org_intensity_filtering(firstcounts$all_gfp_bottom)
+
+intfilt_c1 <- intfilt$gfp_high_intensity %>% filter(chip == 1)
+per_chip_counter_ee(intfilt$gfp_high_intensity) #23
+
+pcaclean <- ee_clean_for_pca(intfilt$gfp_high_intensity)
+
+pcamatrix <- ee_invasion_pcar(pcaclean)
+
+invasion_pcar_graphs(pcamatrix, pcaclean)
+
+pcafiltered <- pcar_density_filter(pcaclean, pcamatrix)
+
+per_chip_counter_ee(pcafiltered$pca_filtered_df) #12
+```
+
+#trying on several chips
+```{r}
+huveclist <- split(test_us$huvec_df, f=test_us$huvec_df$chip)
+
+fit_multi <- lapply(huveclist, function(x) fastTps(x[, c("position_x", "position_y")], Y=x$centroid_z, aRange = 200))
+names(fit_multi) <- c("chip1", "chip2", "chip3", "chip4", "chip5", "chip6")
+#took like 30sec
+
+orglist <- split(test_us$organoid_df, f=test_us$organoid_df$chip)
+names(orglist) <- c("chip1", "chip2", "chip3", "chip4", "chip5", "chip6")
+
+#org_positions <- lapply(orglist, function(x) dplyr::select(x, position_x, position_y))
+
+#org_predictions <- lapply(org_positions, function(x) predict(fit_multi, x))
+
+#org_predictions <- lapply(org_positions, function(x) lapply(fit_multi, function(y) predict(y, x)))
+#i dont think this is correct
+chip1pred <- as.data.frame(org_predictions$`1`[1])
+gfp_pred <- as.data.frame(gfp_pred) %>% rename(X1=V1)
+#these are the same
+
+# testlist <- list()
+# for (i in names(orglist)) {
+#   positions <- as_data_frame(c(orglist$i$position_x),
+#                              c(orglist$i$position_y))
+#     #dplyr::select(orglist$`i`, position_x, position_y)
+#   
+#   modelly <- fit_multi$i
+#   
+#   predicitions <- predict(modelly, positions)
+#   
+#   df_w_predictions <- cbind(orglist$i, predicitions)
+#   
+#  testlist <- append(testlist, df_w_predictions) 
+# }
+
+org_positions <- lapply(orglist, function(x) dplyr::select(x, position_x, position_y))
+
+
+
+#oh wait
+hmmmmmm <- map2(.x=fit_multi, .y=org_positions, ~predict(.x, .y))
+#...did that work?
+#oh shit it mightve
+hmx2 <- map2(.x=orglist, .y=hmmmmmm, ~cbind(.x, .y))
+hmx2clean <- lapply(hmx2, function(x) rename(x, "gfp_pred"=.y))
+
+#oooooh we're doing it now
+preds_together <- bind_rows(hmx2clean)
+#nice!
+#ok so now each chip has its predictions, i need to mutate to just get those below the pred and then count per chip
+allchips <- preds_together %>%
+  group_by(chip) %>%
+  mutate(below_pred = centroid_z < gfp_pred) %>%
+  filter(below_pred == TRUE)
+
+countsz <- per_chip_counter_ee(allchips)
+countsz
+
+position_chip_plots_xy(allchips)
+position_chip_plots_xy(allchips)
+chip_3d_plot_ee(allchips, 6)
+#oh cool!!! 38 seems reasonable maybe
+#see what it looks like when i use the app
+#and when i run intensity and pca filters on this
+
+plot_ly(x=chip_gfp_bottom$position_x, y=chip_gfp_bottom$position_y, z=chip_gfp_bottom$centroid_z)
+```
+
+
+```{r}
+int_allchips <- org_intensity_filtering(allchips)
+per_chip_counter_ee(int_allchips$gfp_high_intensity)
+```
+
+
+```{r}
+surface(fit_multi$chip2)
+```
+
+```{r}
+x2 <- seq(0, max(huveclist$`2`$position_x), len = 100)  #this isnt what i want
+y2 <- seq(0, max(huveclist$`2`$position_y), len = 100) #yposition
+data100 <- expand.grid(x=x2, y=y2) #make big grid -- try field built in?
+fitted.chip2 <- matrix(predict(fit_multi$chip2, data100), 100, 100) #compare fit to grid
+
+fig <- plot_ly(z = fitted.chip2) %>% add_surface()
+
+fig #that looks crazy!!!!! need to ask them if this is a real thing they are seeing
+```
+
+
+```{r}
+endo_boundary_test <- function(huvec_df, cell_type) {
+  
+  mean_huvec_pop <- huvec_df %>% 
+    # filter(`546 Upper Spot Bright - 546 Spot Bright Image Region Centroid Z [¬µm]` >= channel_boundary_number )  %>% 
+    group_by(chip) %>% 
+    summarise(mean_top_bottom = mean(centroid_z), 
+              median_top_bottom = median(centroid_z),
+              sd_top_bottom = sd(centroid_z)
+    ) %>% 
+    mutate(lower_cuttoff = mean_top_bottom - (2 * sd_top_bottom),
+           upper_cuttoff = mean_top_bottom + (2 * sd_top_bottom))
+  
+  middle_chip_huvec <- huvec_df %>% 
+    inner_join(mean_huvec_pop) %>%
+    group_by(chip, field) %>%
+    mutate(top_bottom_2sd_ll = centroid_z >= lower_cuttoff,
+           top_bottom_2sd_ul = centroid_z <= upper_cuttoff)
+  
+  if(cell_type == "organoid"){
+    middle_chip_huvec <- middle_chip_huvec %>%
+      filter(
+        # Field %in% c(4, 5, 6, 7, 8, 9, 10, 11, 12),
+        top_bottom_2sd_ll == TRUE, 
+        top_bottom_2sd_ul == TRUE)
+  }
+  
+  field_chip_huvec <- middle_chip_huvec %>%
+    dplyr::summarise(mean_huvec_z_per_field = mean(centroid_z), 
+                     sd_huvec_z_per_field = sd(centroid_z),
+                     huvec_count = n()) %>% 
+    mutate(mean_huvec_offset = case_when(cell_type == "hct" ~ (mean_huvec_z_per_field + (0.7*(mean_huvec_z_per_field / sd_huvec_z_per_field))),
+                                         cell_type == "organoid" ~ (mean_huvec_z_per_field - (0.25*sd_huvec_z_per_field)))) %>%
+    mutate(mean_huvec_offset_old = (mean_huvec_z_per_field + (1.1*(mean_huvec_z_per_field / sd_huvec_z_per_field)))) %>%
+    ungroup()
+  
+  field_chip_huvec_summary <- field_chip_huvec %>% 
+    dplyr::select(chip, field, mean_huvec_z_per_field, mean_huvec_offset) %>%
+    mutate(mean_huvec_z_per_field = round(mean_huvec_z_per_field, 2),
+           mean_huvec_offset = round(mean_huvec_offset, 2)) %>%
+    dplyr::rename("Chip" = chip, "Field" = field, "Mean Endothelial Z-height" = mean_huvec_z_per_field, "Endothelial Cutoff Z-height" = mean_huvec_offset)
+  
+  huvec_dfs <- list("field_chip_huvec" = field_chip_huvec, "field_chip_huvec_summary" = field_chip_huvec_summary)
+  
+  return(huvec_dfs)
+}
+```
+
+
