@@ -20,7 +20,7 @@ library(factoextra)
 cwd <- here::here()
 
 library(fields)
-library(bigsplines)
+#library(bigsplines)
 #library(plot3D)
 
 source('chip_invasion/functions.R', local = TRUE)
@@ -169,7 +169,7 @@ grid.list <- list(x=seq(1,65), y=seq(1,66.04615))
 dat <- as.matrix(chip1$centroid_z, nr=65, nc=65)
 
 full.grid <- make.surface.grid(grid.list = grid.list)
-new.fit <- spatialProcess(x=chip1[, c("position_x", "position_y")], y=chip1$centroid_z) #takes forever dont do this
+new.fit <- spatialProcess(x=chip1[, c("position_x", "position_y")], y=chip1$centroid_z) #takes forever dont do this. jk do it once to see what it says for arange
 
 summary(new.fit)
 ```
@@ -203,6 +203,12 @@ fig
 
 
 ```{r}
+chip1_gfps_all <- test_us$organoid_df %>%
+  filter(chip==1)
+
+gfp_allcounts <- test_us$organoid_df %>%
+  count(chip)
+
 chip1_gfps <- test_us$organoid_df %>%
   filter(chip==1) %>%
   select(position_x, position_y)
@@ -327,8 +333,21 @@ per_chip_counter_ee(pcafiltered$pca_filtered_df) #12
 huveclist <- split(test_us$huvec_df, f=test_us$huvec_df$chip)
 
 fit_multi <- lapply(huveclist, function(x) fastTps(x[, c("position_x", "position_y")], Y=x$centroid_z, aRange = 200))
+
+#options(spam.nearestdistnnz=c(2146500,400))
+#fit_arange <- lapply(huveclist, function(x) fastTps(x[, c("position_x", "position_y")], Y=x$centroid_z, aRange = 1000)) #this is dumb
+
 names(fit_multi) <- c("chip1", "chip2", "chip3", "chip4", "chip5", "chip6")
 #took like 30sec
+
+se_fits <- lapply(fit_multi, function(x) predictSE(x))
+#upper_ci_fits <- map2(.x=se_fits, .y=fit_multi, ~.y$fitted.values + qnorm(0.975)*.x). 
+se_fits_avg <- lapply(se_fits, function(x) mean(x)*qnorm(0.975)) #is this meaningful at all -- its the avg uncertainty interval for each model fit? i think this makes sense. its like the upper ci
+#se_fits_avg_hm <- map2(.x=se_fits, .y=fit_multi, ~qnorm(0.975, mean = .y$fitted.values, sd=.x)) #not useful rly
+se_together <- bind_rows(se_fits_avg) %>%
+  pivot_longer(cols = 1:6, names_to = "chip_long", values_to = "se") %>%
+  mutate(chip = as.numeric(str_extract_all(chip_long, pattern="[:digit:]"))) %>%
+  dplyr::select(-chip_long)
 
 orglist <- split(test_us$organoid_df, f=test_us$organoid_df$chip)
 names(orglist) <- c("chip1", "chip2", "chip3", "chip4", "chip5", "chip6")
@@ -343,20 +362,7 @@ chip1pred <- as.data.frame(org_predictions$`1`[1])
 gfp_pred <- as.data.frame(gfp_pred) %>% rename(X1=V1)
 #these are the same
 
-# testlist <- list()
-# for (i in names(orglist)) {
-#   positions <- as_data_frame(c(orglist$i$position_x),
-#                              c(orglist$i$position_y))
-#     #dplyr::select(orglist$`i`, position_x, position_y)
-#   
-#   modelly <- fit_multi$i
-#   
-#   predicitions <- predict(modelly, positions)
-#   
-#   df_w_predictions <- cbind(orglist$i, predicitions)
-#   
-#  testlist <- append(testlist, df_w_predictions) 
-# }
+
 
 org_positions <- lapply(orglist, function(x) dplyr::select(x, position_x, position_y))
 
@@ -369,27 +375,81 @@ hmmmmmm <- map2(.x=fit_multi, .y=org_positions, ~predict(.x, .y))
 hmx2 <- map2(.x=orglist, .y=hmmmmmm, ~cbind(.x, .y))
 hmx2clean <- lapply(hmx2, function(x) rename(x, "gfp_pred"=.y))
 
+#hmci <- map2(.x=hmx2clean, .y=se_together, ~left_join(.x,.y, by="chip"))
+
+#hmwerror <- map2(.x=hmx2clean, .y=se_fits, ~cbind(.x, .y))
+#get se
+#org_errors <- #idc like doing this rn
+
+#what if i got the avg/sd of the zheight of the preds, then did +sd of that? or smthng?
+
+
 #oooooh we're doing it now
-preds_together <- bind_rows(hmx2clean)
+preds_together <- bind_rows(hmx2clean) %>% left_join(se_together, by="chip")
 #nice!
 #ok so now each chip has its predictions, i need to mutate to just get those below the pred and then count per chip
-allchips <- preds_together %>%
+allchips_og <- preds_together %>%
   group_by(chip) %>%
   mutate(below_pred = centroid_z < gfp_pred) %>%
   filter(below_pred == TRUE)
 
+counts_tps <- per_chip_counter_ee(allchips_og)
+counts_tps
+
+allchips <- preds_together %>%
+  group_by(chip) %>%
+  mutate(mean_pred = mean(gfp_pred),
+         sd_pred = sd(gfp_pred),
+    below_pred = centroid_z < (gfp_pred+sd_pred)) %>%
+  filter(below_pred == TRUE)
+
 countsz <- per_chip_counter_ee(allchips)
-countsz
+countsz #that is WORSE
 
 position_chip_plots_xy(allchips)
 position_chip_plots_xy(allchips)
-chip_3d_plot_ee(allchips, 6)
+chip_3d_plot_ee(allchips, 1)
 #oh cool!!! 38 seems reasonable maybe
 #see what it looks like when i use the app
 #and when i run intensity and pca filters on this
 
+allchips_error <- preds_together %>%
+  #group_by(chip) %>% #idk if this actually needs to be grouped i dont think it does?
+  mutate(sd_pred = sd(gfp_pred),
+    #below_pred = centroid_z < (gfp_pred+7.363103),
+    below_pred = centroid_z < (gfp_pred+sd_pred),
+         pred_distance = abs(gfp_pred+7.363103 - centroid_z)) %>% #this # is the average sd would it make a diff if i did overall sd? what abt distance between pred and actual?
+  filter(below_pred == TRUE)
+
+countz_e <- per_chip_counter_ee(allchips_error)
+countz_e
+
+allchips_better_error <- preds_together %>%
+  group_by(chip) %>%
+  mutate(below_pred = centroid_z < (gfp_pred+se)) %>%
+  filter(below_pred == TRUE)
+
+more_countz <- per_chip_counter_ee(allchips_better_error)
+more_countz
+
 plot_ly(x=chip_gfp_bottom$position_x, y=chip_gfp_bottom$position_y, z=chip_gfp_bottom$centroid_z)
 ```
+
+```{r}
+allchips_idk <- preds_together %>%
+  group_by(chip) %>%
+  mutate(mean_pred = mean(gfp_pred),
+         sd_pred = sd(gfp_pred),
+    below_pred = centroid_z < (gfp_pred+sd_pred)) %>%
+  ungroup() %>%
+  mutate(mean_sd_pred = mean(sd_pred),
+         below_real_pred = centroid_z < (gfp_pred+mean_sd_pred)) %>%
+  filter(below_real_pred == TRUE)
+
+countsz_idk <- per_chip_counter_ee(allchips_idk)
+countsz_idk #that is fine? sure. the error is the average sd from each chip. thats fine ig.
+```
+
 
 
 ```{r}
@@ -403,10 +463,11 @@ surface(fit_multi$chip2)
 ```
 
 ```{r}
-x2 <- seq(0, max(huveclist$`2`$position_x), len = 100)  #this isnt what i want
-y2 <- seq(0, max(huveclist$`2`$position_y), len = 100) #yposition
+#to do diff chips just change out the #
+x2 <- seq(0, max(huveclist$`3`$position_x), len = 100)  #this isnt what i want
+y2 <- seq(0, max(huveclist$`3`$position_y), len = 100) #yposition
 data100 <- expand.grid(x=x2, y=y2) #make big grid -- try field built in?
-fitted.chip2 <- matrix(predict(fit_multi$chip2, data100), 100, 100) #compare fit to grid
+fitted.chip2 <- matrix(predict(fit_multi$chip3, data100), 100, 100) #compare fit to grid
 
 fig <- plot_ly(z = fitted.chip2) %>% add_surface()
 
@@ -415,51 +476,486 @@ fig #that looks crazy!!!!! need to ask them if this is a real thing they are see
 
 
 ```{r}
-endo_boundary_test <- function(huvec_df, cell_type) {
-  
-  mean_huvec_pop <- huvec_df %>% 
-    # filter(`546 Upper Spot Bright - 546 Spot Bright Image Region Centroid Z [¬µm]` >= channel_boundary_number )  %>% 
-    group_by(chip) %>% 
-    summarise(mean_top_bottom = mean(centroid_z), 
-              median_top_bottom = median(centroid_z),
-              sd_top_bottom = sd(centroid_z)
-    ) %>% 
-    mutate(lower_cuttoff = mean_top_bottom - (2 * sd_top_bottom),
-           upper_cuttoff = mean_top_bottom + (2 * sd_top_bottom))
-  
-  middle_chip_huvec <- huvec_df %>% 
-    inner_join(mean_huvec_pop) %>%
-    group_by(chip, field) %>%
-    mutate(top_bottom_2sd_ll = centroid_z >= lower_cuttoff,
-           top_bottom_2sd_ul = centroid_z <= upper_cuttoff)
-  
-  if(cell_type == "organoid"){
-    middle_chip_huvec <- middle_chip_huvec %>%
-      filter(
-        # Field %in% c(4, 5, 6, 7, 8, 9, 10, 11, 12),
-        top_bottom_2sd_ll == TRUE, 
-        top_bottom_2sd_ul == TRUE)
-  }
-  
-  field_chip_huvec <- middle_chip_huvec %>%
-    dplyr::summarise(mean_huvec_z_per_field = mean(centroid_z), 
-                     sd_huvec_z_per_field = sd(centroid_z),
-                     huvec_count = n()) %>% 
-    mutate(mean_huvec_offset = case_when(cell_type == "hct" ~ (mean_huvec_z_per_field + (0.7*(mean_huvec_z_per_field / sd_huvec_z_per_field))),
-                                         cell_type == "organoid" ~ (mean_huvec_z_per_field - (0.25*sd_huvec_z_per_field)))) %>%
-    mutate(mean_huvec_offset_old = (mean_huvec_z_per_field + (1.1*(mean_huvec_z_per_field / sd_huvec_z_per_field)))) %>%
-    ungroup()
-  
-  field_chip_huvec_summary <- field_chip_huvec %>% 
-    dplyr::select(chip, field, mean_huvec_z_per_field, mean_huvec_offset) %>%
-    mutate(mean_huvec_z_per_field = round(mean_huvec_z_per_field, 2),
-           mean_huvec_offset = round(mean_huvec_offset, 2)) %>%
-    dplyr::rename("Chip" = chip, "Field" = field, "Mean Endothelial Z-height" = mean_huvec_z_per_field, "Endothelial Cutoff Z-height" = mean_huvec_offset)
-  
-  huvec_dfs <- list("field_chip_huvec" = field_chip_huvec, "field_chip_huvec_summary" = field_chip_huvec_summary)
-  
-  return(huvec_dfs)
-}
+allchips_nice <- preds_together %>%
+  group_by(chip) %>%
+  mutate(below_pred = centroid_z <= gfp_pred) %>%
+  filter(below_pred == TRUE) #its the same oh well
+
+#compare 3d plots of normal filtering v new tps filtering
+
+#firstcounts$all_gfp_bottom
+#intfilt$gfp_high_intensity
+chip_3d_plot_ee(firstcounts$all_gfp_bottom, chip_in = 1)
 ```
+
+```{r}
+chip_3d_plot_ee(allchips, chip_in = 1)
+#i feel like i trust tps pre or post int filtering more
+```
+
+
+#imaris counts are so much hogher than i would have expected - its bc the imaris has ~2-3x higher counts of TOTAL gfp cells to begin with, idk what to do abt that
+#try 3d plotting ALL gfp cells just to see what it looks like?? if there is any clear sep??
+#hmmm maybe it is still sitting a bit low? is there an error measurement in this tps fxn i can use?
+
+```{r}
+testorgs <- test_us$organoid_df
+
+chip1test <- testorgs %>% filter(chip == 1)
+
+plot_ly(x=chip1test$position_x, y=chip1test$position_y, z=chip1test$centroid_z, type = "scatter3d", mode="markers")
+```
+
+
+
+#let me try for the other files rachel sent and see if we get the same phenom, check for any read-in probs
+```{r}
+test_us7 <- endothelial_epithelial_reader("/Users/eelton/Dropbox (EITM)/CLS Files Share with Elizabeth 2023/US-GFP Organoids CLS Analysis/20230219exp_D6_Chip7-12_invasion_US-GFP ORGS.xlsx")
+diagnostic_plots_ee(huvec_df = test_us7$huvec_df, test_us7$organoid_df)
+
+huvecs712 <- test_us7$huvec_df
+gfps712 <- test_us7$organoid_df
+
+gfps712counts <- gfps712 %>%
+  count(chip)
+
+huveclist712 <- split(huvecs712, f=huvecs712$chip)
+
+fit_712 <- lapply(huveclist712, function(x) fastTps(x[, c("position_x", "position_y")], Y=x$centroid_z, aRange = 200))
+#names(fit_multi) <- c("chip1", "chip2", "chip3", "chip4", "chip5", "chip6")
+#took a little under 1 min
+se_fits712 <- lapply(fit_712, function(x) predictSE(x))
+#upper_ci_fits <- map2(.x=se_fits, .y=fit_multi, ~.y$fitted.values + qnorm(0.975)*.x). 
+se_fits_avg712 <- lapply(se_fits712, function(x) mean(x)*qnorm(0.975)) #is this meaningful at all -- its the avg uncertainty interval for each model fit? i think this makes sense. its like the upper ci
+#se_fits_avg_hm <- map2(.x=se_fits, .y=fit_multi, ~qnorm(0.975, mean = .y$fitted.values, sd=.x)) #not useful rly
+se_together712 <- bind_rows(se_fits_avg712) %>%
+  pivot_longer(cols = 1:6, names_to = "chip", values_to = "se") %>%
+  mutate(chip = as.double(chip))
+#  dplyr::select(-chip_long)
+
+orglist712 <- split(gfps712, f=gfps712$chip)
+#names(orglist) <- c("chip1", "chip2", "chip3", "chip4", "chip5", "chip6")
+
+org_positions712 <- lapply(orglist712, function(x) dplyr::select(x, position_x, position_y))
+
+predicted_fits712 <- map2(.x=fit_712, .y=org_positions712, ~predict(.x, .y))
+
+gfps_preds712 <- map2(.x=orglist712, .y=predicted_fits712, ~cbind(.x, .y))
+gfp_preds712_clean <- lapply(gfps_preds712, function(x) rename(x, "gfp_pred"=.y))
+
+gfp_preds_together <- bind_rows(gfp_preds712_clean) %>% left_join(se_together712, by="chip")
+
+allchips712 <- gfp_preds_together %>%
+  group_by(chip) %>%
+  mutate(below_pred = centroid_z < gfp_pred) %>%
+  filter(below_pred == TRUE)
+
+per_chip_counter_ee(allchips712)
+#what is the best value for the arange parameter?
+
+allchips_better_error712 <- gfp_preds_together %>%
+  group_by(chip) %>%
+  mutate(below_pred = centroid_z < (gfp_pred+se)) %>%
+  filter(below_pred == TRUE)
+
+more_countz712 <- per_chip_counter_ee(allchips_better_error712)
+more_countz712
+```
+
+```{r}
+allchips_idk712 <- gfp_preds_together %>%
+  group_by(chip) %>%
+  mutate(mean_pred = mean(gfp_pred),
+         sd_pred = sd(gfp_pred),
+    below_pred = centroid_z < (gfp_pred+sd_pred)) %>%
+  ungroup() %>%
+  mutate(mean_sd_pred = mean(sd_pred),
+         below_real_pred = centroid_z < (gfp_pred+mean_sd_pred)) %>%
+  filter(below_real_pred == TRUE)
+
+countsz_idk712 <- per_chip_counter_ee(allchips_idk712)
+countsz_idk712
+```
+
+#normal pipeline for 712
+```{r}
+#runing thru the normal pipeline
+
+
+endobound <- endo_boundary(test_us7$huvec_df, test_us7$cell_type)
+firstcounts <- epi_count(test_us7$organoid_df, endobound$field_chip_huvec)
+firstcounts$gfp_per_chip_bottom #47 pre int,pca #hmm i would have expected this to be lower
+```
+
+
+```{r}
+#surfaces for chips 7-12
+#to do diff chips just change out the #
+x2 <- seq(0, max(huveclist712$`12`$position_x), len = 100)  #this isnt what i want
+y2 <- seq(0, max(huveclist712$`12`$position_y), len = 100) #yposition
+data100 <- expand.grid(x=x2, y=y2) #make big grid -- try field built in?
+fitted.chip7 <- matrix(predict(fit_712$`12`, data100), 100, 100) #compare fit to grid
+
+fig <- plot_ly(z = fitted.chip7) %>% add_surface()
+
+fig 
+#chip 7: but one thing that looks like an outlier... perhaps i do some inital filtering of the orgs before I fit the surface? im wondering if the "scrunches" are layers of orgs that are offset on top of each other -- i could filter out huvecs w same method as before but then fit surface? actually im not confident that would work
+#chip 8: crazy wobbles hmm... it might just be the scale
+#chip 9: sizable wobbles, interesting slant on high-y edge
+#chip 10: interesting dropoff on high-x side
+#chip 11: one crazy low org -- perhaps at the very least i remove outliers before fitting
+#chip 12: again looks like one little outlier on the side, otherwise minimal wobbles -- check scale, maybe these wobbles arent actually that drastic in some??
+```
+
+#chip todo:
+  #attempt to filter out endothelial outliers
+  #functionalize tps code
+  #perform analysis on up data
+
+#do we see outliers in the endo data? or in the predictions? 
+```{r}
+ggplot(huvec_df, aes(x=as.character(chip), y=centroid_z)) +
+  geom_boxplot() #so there are some outliers this way
+#filter by iqr? outside ci?
+ggplot(huvecs712, aes(x=as.character(chip), y=centroid_z)) +
+  geom_boxplot()
+
+ggplot(huvec_df) +
+  geom_density(aes(x=centroid_z, color=as.character(chip))) +
+  facet_wrap(~chip, scales = "free")
+
+#hmmm perhaps i filter by 95% ci, see how that looks on boxplot & after tps fit
+
+huvec_norm <- huvec_df %>%
+  group_by(chip) %>%
+  mutate( #n = count(centroid_z),
+    mean_z = mean(centroid_z),
+         sd_z = sd(centroid_z),
+         upper_ci_z = qnorm(0.99, mean = mean_z, sd=sd_z),
+         lower_ci_z = qnorm(0.01, mean = mean_z, sd=sd_z),
+         within_ci = ((lower_ci_z < centroid_z) & (centroid_z < upper_ci_z)),
+    #      new_bound_u =1.5*IQR(centroid_z) + quantile(centroid_z, probs = 0.75),
+    # new_bound_l = quantile(centroid_z, probs = 0.25) - 1.5*IQR(centroid_z),
+    # within_new_bound = ((new_bound_l < centroid_z) & (centroid_z < new_bound_u))
+         #new_ci = quantile(centroid_z, probs = c(0.025, 0.975))
+         )  %>%
+  filter(within_new_bound == TRUE)
+  
+  #mutate(sem_bound = 1.5*IQR(abs_ec50_se, na.rm = TRUE) + quantile(abs_ec50_se, probs = .75, na.rm = TRUE))
+
+ggplot(huvec_norm, aes(x=as.character(chip), y=centroid_z)) +
+  geom_boxplot() +
+  geom_quasirandom(aes(color=within_new_bound))
+
+ggplot(huvec_norm) +
+  geom_histogram(aes(x=centroid_z, fill=within_ci)) +
+  facet_wrap(~chip, scales = "free")
+
+huvec_norm_712 <- huvecs712 %>%
+  group_by(chip) %>%
+  mutate(mean_z = mean(centroid_z),
+         sd_z = sd(centroid_z),
+         upper_ci_z = qnorm(0.99, mean = mean_z, sd=sd_z),
+         lower_ci_z = qnorm(0.01, mean = mean_z, sd=sd_z),
+         within_ci = ((lower_ci_z < centroid_z) & (centroid_z < upper_ci_z)),
+    #      new_bound_u =1.5*IQR(centroid_z) + quantile(centroid_z, probs = 0.75),
+    # new_bound_l = quantile(centroid_z, probs = 0.25) - 1.5*IQR(centroid_z),
+    # within_new_bound = ((new_bound_l < centroid_z) & (centroid_z < new_bound_u))
+         ) #%>%  filter(within_new_bound == TRUE)
+
+ggplot(huvec_norm_712, aes(x=as.character(chip), y=centroid_z)) +
+  geom_violin()
+  geom_boxplot() #+
+  geom_quasirandom(aes(color=within_new_bound))
+
+ggplot(huvec_norm_712) +
+  geom_histogram(aes(x=centroid_z, fill=within_ci)) +
+  facet_wrap(~chip, scales = "free")
+
+#what do the surfaces, counts, se look like when i do this?  might still be too stringent
+```
+
+
+
+```{r}
+huvecnormlist <- split(huvec_norm, f=huvec_norm$chip)
+
+fit_norm <- lapply(huvecnormlist, function(x) fastTps(x[, c("position_x", "position_y")], Y=x$centroid_z, aRange = 200)) #maybe change back to 100, there is no diff on counts and the 200 takes longer
+#names(fit_multi) <- c("chip1", "chip2", "chip3", "chip4", "chip5", "chip6")
+#took a little under 1 min
+se_fitsnorm <- lapply(fit_norm, function(x) predictSE(x))
+#upper_ci_fits <- map2(.x=se_fits, .y=fit_multi, ~.y$fitted.values + qnorm(0.975)*.x). 
+se_fits_avgnorm <- lapply(se_fitsnorm, function(x) mean(x)*qnorm(0.975)) #is this meaningful at all -- its the avg uncertainty interval for each model fit? i think this makes sense. its like the upper ci
+#se_fits_avg_hm <- map2(.x=se_fits, .y=fit_multi, ~qnorm(0.975, mean = .y$fitted.values, sd=.x)) #not useful rly
+se_togethernorm <- bind_rows(se_fits_avgnorm) %>%
+  pivot_longer(cols = 1:6, names_to = "chip", values_to = "se") %>%
+  mutate(chip = as.double(chip))
+#  dplyr::select(-chip_long)
+
+
+predicted_fitsnorm <- map2(.x=fit_norm, .y=org_positions, ~predict(.x, .y))
+
+gfps_predsnorm <- map2(.x=orglist, .y=predicted_fitsnorm, ~cbind(.x, .y))
+gfp_predsnorm_clean <- lapply(gfps_predsnorm, function(x) rename(x, "gfp_pred"=.y))
+
+gfp_preds_togethernorm <- bind_rows(gfp_predsnorm_clean) %>% left_join(se_togethernorm, by="chip")
+
+allchips_better_errornorm <- gfp_preds_togethernorm %>%
+  group_by(chip) %>%
+  mutate(below_pred = centroid_z < (gfp_pred+se)) %>%
+  filter(below_pred == TRUE)
+
+more_countznorm <- per_chip_counter_ee(allchips_better_errornorm)
+more_countznorm #nearly the same - not off by enough for me to worry? compare surfaces, ch7-12 and decide if its worth
+```
+
+```{r}
+x2 <- seq(0, max(huvecnormlist$`1`$position_x), len = 100)  
+y2 <- seq(0, max(huvecnormlist$`1`$position_y), len = 100) #yposition
+data100 <- expand.grid(x=x2, y=y2) #make big grid -- try field built in?
+fitted.chipnorm <- matrix(predict(fit_norm$`1`, data100), 100, 100) #compare fit to grid
+
+fig <- plot_ly(z = fitted.chipnorm, colors = "plasma") %>% add_surface()
+
+fig 
+```
+
+
+```{r}
+surface(fit_norm$`6`, type = "c")
+```
+
+#get per-field counts for the chips
+#compare to amaris - will still probs be low i am guessing
+```{r}
+per_field_counter_ee(allchips_better_errornorm)
+```
+#same thing but w chips 7-12
+
+```{r}
+huvecnormlist <- split(huvec_norm_712, f=huvec_norm_712$chip)
+
+fit_norm <- lapply(huvecnormlist, function(x) fastTps(x[, c("position_x", "position_y")], Y=x$centroid_z, aRange = 200)) #maybe change back to 100, there is no diff on counts and the 200 takes longer
+#names(fit_multi) <- c("chip1", "chip2", "chip3", "chip4", "chip5", "chip6")
+#took a little under 1 min
+se_fitsnorm <- lapply(fit_norm, function(x) predictSE(x))
+#upper_ci_fits <- map2(.x=se_fits, .y=fit_multi, ~.y$fitted.values + qnorm(0.975)*.x). 
+se_fits_avgnorm <- lapply(se_fitsnorm, function(x) mean(x)*qnorm(0.975)) #is this meaningful at all -- its the avg uncertainty interval for each model fit? i think this makes sense. its like the upper ci
+#se_fits_avg_hm <- map2(.x=se_fits, .y=fit_multi, ~qnorm(0.975, mean = .y$fitted.values, sd=.x)) #not useful rly
+se_togethernorm <- bind_rows(se_fits_avgnorm) %>%
+  pivot_longer(cols = 1:6, names_to = "chip", values_to = "se") %>%
+  mutate(chip = as.double(chip))
+#  dplyr::select(-chip_long)
+
+predicted_fitsnorm <- map2(.x=fit_norm, .y=org_positions712, ~predict(.x, .y))
+
+gfps_predsnorm <- map2(.x=orglist712, .y=predicted_fitsnorm, ~cbind(.x, .y))
+gfp_predsnorm_clean <- lapply(gfps_predsnorm, function(x) rename(x, "gfp_pred"=.y))
+
+gfp_preds_togethernorm <- bind_rows(gfp_predsnorm_clean) %>% left_join(se_togethernorm, by="chip")
+
+allchips_better_errornorm <- gfp_preds_togethernorm %>%
+  group_by(chip) %>%
+  mutate(below_pred = centroid_z < (gfp_pred+se)) %>%
+  filter(below_pred == TRUE)
+
+more_countznorm712 <- per_chip_counter_ee(allchips_better_errornorm)
+more_countznorm712 #nearly the same - not off by enough for me to worry? compare surfaces, ch7-12 and decide if its worth
+```
+
+```{r}
+x2 <- seq(0, max(huvecnormlist$`12`$position_x), len = 100)  
+y2 <- seq(0, max(huvecnormlist$`12`$position_y), len = 100) #yposition
+data100 <- expand.grid(x=x2, y=y2) #make big grid -- try field built in?
+fitted.chipnorm <- matrix(predict(fit_norm$`12`, data100), 100, 100) #compare fit to grid
+
+fig <- plot_ly(z = fitted.chipnorm, colors = "plasma") %>% add_surface()
+
+fig 
+```
+
+
+
+#functionalize stuff!!!
+```{r}
+#huvec outlier filtering... idk if i want this or not
+huvec_norm <- huvec_df %>%
+  group_by(chip) %>%
+  mutate( #n = count(centroid_z),
+    mean_z = mean(centroid_z),
+         sd_z = sd(centroid_z),
+         upper_ci_z = qnorm(0.99, mean = mean_z, sd=sd_z),
+         lower_ci_z = qnorm(0.01, mean = mean_z, sd=sd_z),
+         within_ci = ((lower_ci_z < centroid_z) & (centroid_z < upper_ci_z)),
+    #      new_bound_u =1.5*IQR(centroid_z) + quantile(centroid_z, probs = 0.75),
+    # new_bound_l = quantile(centroid_z, probs = 0.25) - 1.5*IQR(centroid_z),
+    # within_new_bound = ((new_bound_l < centroid_z) & (centroid_z < new_bound_u))
+         #new_ci = quantile(centroid_z, probs = c(0.025, 0.975))
+         )  %>%
+  filter(within_new_bound == TRUE)
+  
+  #mutate(sem_bound = 1.5*IQR(abs_ec50_se, na.rm = TRUE) + quantile(abs_ec50_se, probs = .75, na.rm = TRUE))
+
+ggplot(huvec_norm, aes(x=as.character(chip), y=centroid_z)) +
+  geom_boxplot() +
+  geom_quasirandom(aes(color=within_new_bound))
+
+ggplot(huvec_norm) +
+  geom_histogram(aes(x=centroid_z, fill=within_ci)) +
+  facet_wrap(~chip, scales = "free")
+
+huvec_norm_712 <- huvecs712 %>%
+  group_by(chip) %>%
+  mutate(mean_z = mean(centroid_z),
+         sd_z = sd(centroid_z),
+         upper_ci_z = qnorm(0.99, mean = mean_z, sd=sd_z),
+         lower_ci_z = qnorm(0.01, mean = mean_z, sd=sd_z),
+         within_ci = ((lower_ci_z < centroid_z) & (centroid_z < upper_ci_z)),
+    #      new_bound_u =1.5*IQR(centroid_z) + quantile(centroid_z, probs = 0.75),
+    # new_bound_l = quantile(centroid_z, probs = 0.25) - 1.5*IQR(centroid_z),
+    # within_new_bound = ((new_bound_l < centroid_z) & (centroid_z < new_bound_u))
+         ) #%>%  filter(within_new_bound == TRUE)
+
+ggplot(huvec_norm_712, aes(x=as.character(chip), y=centroid_z)) +
+  geom_violin()
+  geom_boxplot() #+
+  geom_quasirandom(aes(color=within_new_bound))
+
+ggplot(huvec_norm_712) +
+  geom_histogram(aes(x=centroid_z, fill=within_ci)) +
+  facet_wrap(~chip, scales = "free")
+
+###
+
+
+huvecnormlist <- split(huvec_norm, f=huvec_norm$chip)
+
+fit_norm <- lapply(huvecnormlist, function(x) fastTps(x[, c("position_x", "position_y")], Y=x$centroid_z, aRange = 200)) #maybe change back to 100, there is no diff on counts and the 200 takes longer
+#names(fit_multi) <- c("chip1", "chip2", "chip3", "chip4", "chip5", "chip6")
+#took a little under 1 min
+se_fitsnorm <- lapply(fit_norm, function(x) predictSE(x))
+#upper_ci_fits <- map2(.x=se_fits, .y=fit_multi, ~.y$fitted.values + qnorm(0.975)*.x). 
+se_fits_avgnorm <- lapply(se_fitsnorm, function(x) mean(x)*qnorm(0.975)) #is this meaningful at all -- its the avg uncertainty interval for each model fit? i think this makes sense. its like the upper ci
+#se_fits_avg_hm <- map2(.x=se_fits, .y=fit_multi, ~qnorm(0.975, mean = .y$fitted.values, sd=.x)) #not useful rly
+se_togethernorm <- bind_rows(se_fits_avgnorm) %>%
+  pivot_longer(cols = 1:6, names_to = "chip", values_to = "se") %>%
+  mutate(chip = as.double(chip))
+#  dplyr::select(-chip_long)
+
+
+predicted_fitsnorm <- map2(.x=fit_norm, .y=org_positions, ~predict(.x, .y))
+
+gfps_predsnorm <- map2(.x=orglist, .y=predicted_fitsnorm, ~cbind(.x, .y))
+gfp_predsnorm_clean <- lapply(gfps_predsnorm, function(x) rename(x, "gfp_pred"=.y))
+
+gfp_preds_togethernorm <- bind_rows(gfp_predsnorm_clean) %>% left_join(se_togethernorm, by="chip")
+
+allchips_better_errornorm <- gfp_preds_togethernorm %>%
+  group_by(chip) %>%
+  mutate(below_pred = centroid_z < (gfp_pred+se)) %>%
+  filter(below_pred == TRUE)
+
+more_countznorm <- per_chip_counter_ee(allchips_better_errornorm)
+more_countznorm #nearly the same - not off by enough for me to worry? compare surfaces, ch7-12 and decide if its worth
+
+
+###
+
+cute_surface_maker <- function(huvec_list, fit_list, chip) {
+  
+  x_seq <- seq(0, max(huvec_list$`chip`$position_x), len = 100)
+  y_seq <- seq(0, max(huvec_list$`chip`$position_y), len = 100)  
+
+  pos_grid <- expand.grid(x=x_seq, y=y_seq)
+  
+  fit_matrix <- matrix(predict(fit_list$`chip`, pos_grid), 100, 100)
+  
+  cute_surface <- plot_ly(z=fit_matrix, colors = "plasma") %>% 
+    add_surface()
+  
+  return(cute_surface)
+  
+  }
+
+x2 <- seq(0, max(huvecnormlist$`3`$position_x), len = 100)  
+y2 <- seq(0, max(huvecnormlist$`3`$position_y), len = 100) #yposition
+data100 <- expand.grid(x=x2, y=y2) #make big grid -- try field built in?
+fitted.chipnorm <- matrix(predict(fit_norm$`3`, data100), 100, 100) #compare fit to grid
+
+fig <- plot_ly(z = fitted.chipnorm, colors = "magma") %>% add_surface()
+
+fig 
+
+
+#fxn inputs:
+  #huvec df
+  #gfp df
+  #xyz pos of gfp_df?
+#fxn outputs:
+  #huvec df as a list
+  #fit fxns as a list
+    #these will be inputs for 3d plot
+  #filtered gfp df
+
+endo_boundzer <- function(huvec_df, organoid_df) {
+  
+  endo_chip_list <- split(huvec_df, f=huvec_df$chip)
+  epi_chip_list <- split(organoid_df, f=organoid_df$chip)
+  
+  org_positions <- lapply(epi_chip_list, function(x) dplyr::select(x, position_x, position_y))
+  
+  endo_fits <- lapply(endo_chip_list, function(x) fastTps(x[, c("position_x", "position_y")], Y=x$centroid_z, aRange = 200)) 
+  
+  se_endo_fits <- lapply(endo_fits, function(x) predictSE(x))
+  avg_se_fits <- lapply(se_endo_fits, function(x) mean(x)*qnorm(0.975)) #top half of the ci around the fitted surface
+  ses_together <- bind_rows(avg_se_fits) %>%
+    pivot_longer(cols = 1:6, names_to = "chip", values_to = "se") %>%
+    mutate(chip = as.double(chip))
+  
+  pred_fits <- map2(.x=endo_fits, .y=org_positions, ~predict(.x, .y))
+  org_fits <- map2(.x=epi_chip_list, .y=pred_fits, ~cbind(.x, .y))
+  org_fits_clean <- lapply(org_fits, function(x) rename(x, "gfp_pred"=.y))
+  
+  ## split off here in some way
+  org_fits_joined <- bind_rows(org_fits_clean) %>% 
+    left_join(ses_together, by="chip") %>%
+    group_by(chip) %>%
+    mutate(below_pred = centroid_z < (gfp_pred+se)) %>%
+    filter(below_pred == TRUE)
+  
+  stuff_to_return <- list("huvec_list" = endo_chip_list, 
+                          "org_list" = epi_chip_list, 
+                          "fit_list" <- endo_fits, 
+                          "all_gfp_bottom_channel" = org_fits_joined)
+  
+  return(stuff_to_return)
+}
+
+```
+
+#testing out all my cute lil fxns together
+
+```{r}
+source('functions_tps.R', local = TRUE)
+
+test_files <- endothelial_epithelial_reader("/Users/eelton/Dropbox (EITM)/CLS Files Share with Elizabeth 2023/US-GFP Organoids CLS Analysis/20230219exp_D6_Chip1-6_invasion_US-GFP ORGS.xlsx")
+
+diagnostic_plots_ee(test_files$huvec_df, test_files$organoid_df)
+
+test_bound <- endo_boundzer(huvec_df = test_files$huvec_df, organoid_df = test_files$organoid_df) #this is the long part, takes abt a min and a half in total - should add some kind of loading icon if i can
+
+test_org_fits <- test_bound$org_fits_df
+
+test_counts <- epi_count(test_org_fits)
+
+test_counts$gfp_per_chip_bottom #i am the queen of writing functions
+
+test_cute_surface <- cute_surface_maker(test_bound$huvec_list, test_bound)
+
+###### TODO: rerun test bound, then test out cute surfeace maker, i fee liffy abt the chip indexing
+```
+
+
+
 
 
