@@ -72,7 +72,7 @@ endo_boundzer <- function(huvec_df, organoid_df) {
   se_endo_fits <- lapply(endo_fits, function(x) predictSE(x))
   avg_se_fits <- lapply(se_endo_fits, function(x) mean(x)*qnorm(0.975)) #top half of the ci around the fitted surface
   ses_together <- bind_rows(avg_se_fits) %>%
-    pivot_longer(cols = 1:6, names_to = "chip", values_to = "se") %>%
+    pivot_longer(cols = everything(), names_to = "chip", values_to = "se") %>% #damn it
     mutate(chip = as.double(chip))
   
   pred_fits <- map2(.x=endo_fits, .y=org_positions, ~predict(.x, .y))

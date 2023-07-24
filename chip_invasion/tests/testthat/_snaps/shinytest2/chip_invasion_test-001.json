@@ -1,0 +1,47 @@
+{
+  "input": {
+    "boxplotz": 0,
+    "chip_num": 1,
+    "gfp_huvec_upload": {
+      "name": [
+        "test_endo.xlsx"
+      ],
+      "size": [
+        8518470
+      ],
+      "type": [
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      ],
+      "datapath": [
+        "0.xlsx"
+      ]
+    },
+    "perfield_runner": 0,
+    "posplotz": 0,
+    "posplotzxz": 0,
+    "runner": 0,
+    "surfaceplot": 0,
+    "threedee": 0
+  },
+  "output": {
+    "analysis_table_all": {
+      "message": "",
+      "call": "NULL",
+      "type": [
+        "shiny.silent.error",
+        "validation"
+      ]
+    },
+    "field_table": {
+      "message": "",
+      "call": "NULL",
+      "type": [
+        "shiny.silent.error",
+        "validation"
+      ]
+    }
+  },
+  "export": {
+
+  }
+}
