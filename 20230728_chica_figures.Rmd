@@ -1,0 +1,116 @@
+---
+title: "20230728_chica_figures"
+author: "Elizabeth Elton"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+source('chip_invasion/functions.R', local=TRUE)
+library(spam64)
+options(spam.force64 = TRUE)
+```
+
+```{r}
+cute_surface_maker_newbie <- function(huvec_list, fit_list, chip_in, bottom_gfp_df) {
+ # browser()
+  x_seq <- seq(0, max(huvec_list[[chip_in]]$position_x), len = 100)
+  y_seq <- seq(0, max(huvec_list[[chip_in]]$position_y), len = 100)  
+  
+  pos_grid <- expand.grid(x=x_seq, y=y_seq)
+  
+  #position_grid <- as.data.frame(x=huvec_list[[chip]]$position_x, y=huvec_list[[chip]]$position_y)
+  
+  fit_matrix <- matrix(predict(fit_list[[chip_in]], pos_grid), 100, 100) #this is not the same z as for the actual boundary bc it is based on the transformed x/y -- how can i use the actual values??
+  
+  chip_used <- bottom_gfp_df %>% filter(chip == chip_in)
+  
+  pos_x <- chip_used$position_x
+  new_x <- ((chip_used$position_x + abs(min(chip_used$position_x))) * (100/(abs(min(chip_used$position_x)) + max(chip_used$position_x))))  #need to make generalizable to any chip if this works
+  pos_y <- chip_used$position_y
+  new_y <- ((chip_used$position_y + abs(min(chip_used$position_y))) * (100/(abs(min(chip_used$position_y)) + max(chip_used$position_y)))) 
+  pos_z <- chip_used$centroid_z
+  
+  plot_ly(z=fit_matrix, colors = "plasma") %>% 
+    add_surface(contours = list(
+    z = list(
+      show=TRUE,
+      usecolormap=TRUE,
+      highlightcolor="#406605",
+      project=list(z=TRUE)
+      )
+    )) %>%
+    add_trace(type = "scatter3d", mode="markers", x=new_x, y=new_y, z = pos_z) #%>%
+    #layout(xaxis = list(scaleanchor = "y", scaleratio = 1), data = fit_matrix)
+  
+  #return(cute_surface)
+  
+} #TO DO: integrate into app UI
+```
+
+```{r}
+us_og_data <- endothelial_epithelial_reader("/Users/eelton/Dropbox (EITM)/CLS Files Share with Elizabeth 2023/US-GFP Organoids CLS Analysis/20230219exp_D6_Chip1-6_invasion_US-GFP ORGS.xlsx")
+
+test_data <- endothelial_epithelial_reader("chip_invasion/tests/testthat/test_endo.xlsx")
+
+huvecs <- us_og_data$huvec_df
+us_orgs <- us_og_data$organoid_df
+
+#diagnostic_plots_ee(huvecs, us_orgs)
+
+endoz <- endo_boundzer(huvecs, us_orgs)
+
+the_counts <- epi_count(endoz$org_fits_df)
+
+the_counts$gfp_per_chip_bottom
+
+chip1 <- the_counts$all_gfp_bottom %>% filter(chip == 1)
+```
+
+
+```{r}
+cute_surface_maker_newbie(endoz$huvec_list, endoz$fit_list, chip_in = 5, bottom_gfp_df = the_counts$all_gfp_bottom)
+```
+# yay!!!!!
+# so now i need to do this but with a flat surface which *should* be easier
+#need to get the mean z-height of the huvecs
+#then plot as a surface
+
+#mean chip3 huvec height:
+```{r}
+chip3_huvecs <- huvecs %>% filter(chip == 5)
+mean_z <- mean(chip3_huvecs$centroid_z) # ~120
+```
+
+
+
+```{r}
+chip3 <- the_counts$all_gfp_bottom %>% filter(chip == 5)
+
+  new_x3 <- ((chip3$position_x + abs(min(chip3$position_x))) * (100/(abs(min(chip3$position_x)) + max(chip3$position_x))))  
+  new_y3 <- ((chip3$position_y + abs(min(chip3$position_y))) * (100/(abs(min(chip3$position_y)) + max(chip3$position_y)))) 
+  
+zmatrix <- matrix(data = mean_z, nrow=100, ncol = 100)
+  
+  plot_ly(z=zmatrix, colors = "plasma") %>% 
+    add_surface() %>%
+    add_trace(type = "scatter3d", mode="markers", x=new_x3, y=new_y3, z = chip3$centroid_z) #oh wait this isnt quite right, i need to filter based on this boundary? maybe this chip isnt that great of an example bc its p flat
+```
+
+#flat filtered
+```{r}
+chip3_flat <- us_orgs %>% 
+  filter(chip == 5,
+         centroid_z < mean_z)
+
+  flat_x3 <- ((chip3_flat$position_x + abs(min(chip3_flat$position_x))) * (100/(abs(min(chip3_flat$position_x)) + max(chip3_flat$position_x))))  
+  flat_y3 <- ((chip3_flat$position_y + abs(min(chip3_flat$position_y))) * (100/(abs(min(chip3_flat$position_y)) + max(chip3_flat$position_y)))) 
+
+plot_ly(z=zmatrix, colors = "plasma") %>% 
+    add_surface() %>%
+    add_trace(type = "scatter3d", mode="markers", x=flat_x3, y=flat_y3, z = chip3_flat$centroid_z) #oh see what would be realllly sick is if i could label the objects that r missing in a different color... or is that overkill
+#stick w this for now and see what naim & co think
+```
+
