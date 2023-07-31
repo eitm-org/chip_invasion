@@ -1,3 +1,4 @@
+install.packages('shinytest2')
 library(shinytest2)
 
 test_that("{shinytest2} recording: chip_invasion_test", {
