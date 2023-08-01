@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - elizabeth
+      - xchen_descr_method 
 
 name: Test app
 
