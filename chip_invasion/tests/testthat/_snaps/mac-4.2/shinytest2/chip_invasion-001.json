@@ -1,0 +1,52 @@
+{
+  "input": {
+    "boxplotz": 0,
+    "chip_num": 1,
+    "gfp_huvec_upload": {
+      "name": [
+        "test_data.xlsx"
+      ],
+      "size": [
+        8501467
+      ],
+      "type": [
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      ],
+      "datapath": [
+        "0.xlsx"
+      ]
+    },
+    "perfield_runner": 0,
+    "posplotz": 0,
+    "posplotzxz": 0,
+    "runner": 1,
+    "surfaceplot": 0,
+    "threedee": 0,
+    "waiter_hidden": true,
+    "waiter_shown": true
+  },
+  "output": {
+    "analysis_table_all": {
+      "colnames": [
+        "Chip",
+        "Epithelial Cells in the Bottom Channel"
+      ],
+      "options": null,
+      "evalOptions": null,
+      "searchDelay": 500,
+      "callback": "function(oTable) {}",
+      "escape": true
+    },
+    "field_table": {
+      "message": "",
+      "call": "NULL",
+      "type": [
+        "shiny.silent.error",
+        "validation"
+      ]
+    }
+  },
+  "export": {
+
+  }
+}
