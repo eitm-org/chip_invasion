@@ -1,5 +1,4 @@
 library(shinytest2)
-
 test_that("{shinytest2} recording: chip_invasion_test", {
   app <- AppDriver$new(name = "chip_invasion_test", height = 844, width = 1256)
   app$upload_file(gfp_huvec_upload = "test_endo.xlsx")
