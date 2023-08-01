@@ -1,3 +1,5 @@
+Package: chip_invasion
+Title: Chip Invasion
 Imports:
   shiny,
   shinytest2
