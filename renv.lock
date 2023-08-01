@@ -2223,6 +2223,13 @@
       ],
       "Hash": "2024a309411ff865488552f108c68333"
     },
+    "spam64": {
+      "Package": "spam64",
+      "Version": "2.9-0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "6766dcce023c97ba9b395221895ba078"
+    },
     "stringi": {
       "Package": "stringi",
       "Version": "1.7.12",
