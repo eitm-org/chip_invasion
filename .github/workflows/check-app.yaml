@@ -6,7 +6,7 @@ on:
       - main
       - elizabeth
 
-name: Test app
+name: Test app w/ {renv}
 
 jobs:
   test-app:
