@@ -1,11 +1,12 @@
 # Workflow derived from https://github.com/rstudio/shinytest2/tree/main/actions/test-app/example-test-app-description.yaml
 # Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
-on:
-  push:
-    branches:
-      - main
+# on:
+#   push:
+#     branches:
+    #  - main
+     # - elizabeth #commenting out untl we can this out
 
-name: Test app
+name: Test app w/ {renv}
 
 jobs:
   test-app:
@@ -17,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - {os: ubuntu-latest, r: release}
+          - {os: ubuntu-latest, r: 4.2.2}
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
@@ -33,10 +34,11 @@ jobs:
           r-version: ${{ matrix.config.r }}
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
+          
+      - uses: r-lib/actions/setup-renv@v2
 
       - uses: rstudio/shinytest2/actions/test-app@v1
         with:
-          app-dir: |
-            chip_invasion
+          app-dir: "chip_invasion"
           upload-snapshots: true
         

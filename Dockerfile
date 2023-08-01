@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     libxt-dev \
     libssl-dev \
     libssh2-1-dev \
-    libssl1.1 \
+    libssl3 \
     libxml2 \
     && rm -rf /var/lib/apt/lists/*
 
