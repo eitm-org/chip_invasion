@@ -1,41 +1,8 @@
 Package: chip_invasion
 Title: Chip Invasion
 Version: 0.0.1
-Depends:
-    testthat
+URL: https://github.com/eitm-org/chip_invasion
 Imports:
-    R6,
-    callr,
-    checkmate,
-    chromote,
-    crayon,
-    ellipsis,
-    fs,
-    globals,
-    httr,
-    jsonlite,
-    pingr,
-    rlang (>= 0.3.0),
-    rmarkdown,
     shiny,
-    withr
-Suggests:
-    deSolve,
-    diffobj,
-    ggplot2,
-    knitr,
-    plotly,
-    png,
-    rstudioapi,
-    shinyWidgets,
-    shinytest,
-    shinyvalidate.
-    showimage,
-    usethis,
-    vdiffr,
-    spelling
-Config/Needs/check:
-    rstudio/shiny
-Config/Needs/website:
-    pkgdown,
-    tidyverse/tidytemplate
+    withr,
+    shinytest

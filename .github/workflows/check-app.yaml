@@ -45,4 +45,3 @@ jobs:
         with:
           app-dir: "chip_invasion"
           upload-snapshots: true
-        
