@@ -3,8 +3,8 @@
 on:
   push:
     branches:
-      - main
-      - elizabeth
+    #  - main
+     # - elizabeth #commenting out untl we can this out
 
 name: Test app w/ {renv}
 
@@ -36,9 +36,9 @@ jobs:
           use-public-rspm: true
           
       - uses: r-lib/actions/setup-renv@v2
-      
-      - name: Test Shiny App
-          shell: Rscript {0}
-          run: |
-            shinytest2::test_app("chip_invasion")
+
+      - uses: rstudio/shinytest2/actions/test-app@v1
+        with:
+          app-dir: "chip_invasion"
+          upload-snapshots: true
         
