@@ -4,5 +4,6 @@ Version: 0.0.1
 Imports:
   shiny,
   shinytest2
+  waiter
   
   
