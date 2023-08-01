@@ -1,6 +1,9 @@
 Package: chip_invasion
 Title: Chip Invasion
 Version: 0.0.1
+Depends:
+  testthat (>= 3.1.2)
+  waiter
 Imports:
   shiny,
   shinytest2
