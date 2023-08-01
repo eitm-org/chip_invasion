@@ -43,3 +43,11 @@ jobs:
         key: ${{ secrets.KEY }}
         port: 22
         script: docker login ghcr.io -u eltonelizabeth --password ${{ secrets.GITHUB_TOKEN }} && docker pull ghcr.io/eitm-org/chip_invasion:latest
+    - name: Executing Remote Ssh Command to Pull Docker Image to shiny-apps to the public webserver
+      uses: appleboy/ssh-action@master
+      with:
+        host: 158.101.38.247
+        username: opc
+        key: ${{ secrets.KEY }}
+        port: 22
+        script: docker login ghcr.io -u eltonelizabeth --password ${{ secrets.GITHUB_TOKEN }} && docker pull ghcr.io/eitm-org/chip_invasion:latest
