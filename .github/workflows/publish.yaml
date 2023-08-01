@@ -42,4 +42,4 @@ jobs:
         username: opc
         key: ${{ secrets.KEY }}
         port: 22
-        script: docker pull ghcr.io/eitm-org/chip_invasion:latest
+        script: echo $GITHUB_ACCESS_TOKEN | docker login ghcr.io -u xingyaoc --password-stdin && docker pull ghcr.io/eitm-org/chip_invasion:latest
