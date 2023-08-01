@@ -39,6 +39,6 @@ jobs:
 
       - uses: rstudio/shinytest2/actions/test-app@v1
         with:
-          app-dir: "./chip_invasion/"
+          app-dir: "."
           upload-snapshots: true
         
