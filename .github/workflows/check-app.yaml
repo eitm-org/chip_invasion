@@ -35,22 +35,14 @@ jobs:
           r-version: ${{ matrix.config.r }}
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
-<<<<<<< HEAD
-=======
-          
-      - uses: r-lib/actions/setup-renv@v2
->>>>>>> a9f18feaf2a5f3e2d706769eb299642f216b7274
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-<<<<<<< HEAD
           extra-packages:
             shinytest2
       
       - name: Test app (main)
         uses: rstudio/shinytest2/actions/test-app@v1
         with:
-=======
->>>>>>> a9f18feaf2a5f3e2d706769eb299642f216b7274
           app-dir: "chip_invasion"
           upload-snapshots: true
