@@ -5,4 +5,15 @@ Version: 0.0.1
 Imports:
     shiny,
     shinytest2,
-    waiter
+    waiter,
+    tidyverse,
+    here,
+    janitor,
+    readxl,
+    hablar,
+    ggbeeswarm,
+    plotly,
+    FactoMineR,
+    factoextra,
+    fields,
+    bslib
