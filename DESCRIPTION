@@ -1,7 +1,7 @@
 Package: chip_invasion
 Title: Chip Invasion
 Version: 0.0.1
-URL: https://github.com/eitm-org/chip_invasion
+# URL: https://github.com/eitm-org/chip_invasion
 Imports:
     shiny,
     shinytest2
