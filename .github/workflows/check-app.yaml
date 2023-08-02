@@ -7,7 +7,7 @@ on:
       - elizabeth
       - xchen_descr_method 
 
-name: Test app w/ DESCRIPTION
+name: Test app
 
 jobs:
   test-app:
@@ -35,14 +35,10 @@ jobs:
           r-version: ${{ matrix.config.r }}
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
-
+          
       - uses: r-lib/actions/setup-r-dependencies@v2
-        with:
-          extra-packages:
-            shinytest2
-      
-      - name: Test app (main)
-        uses: rstudio/shinytest2/actions/test-app@v1
+
+      - uses: rstudio/shinytest2/actions/test-app@v1
         with:
           app-dir: "chip_invasion"
           upload-snapshots: true
