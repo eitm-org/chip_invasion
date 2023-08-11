@@ -1,12 +1,13 @@
 # Workflow derived from https://github.com/rstudio/shinytest2/tree/main/actions/test-app/example-test-app-description.yaml
 # Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
-# on:
-#   push:
-#     branches:
-    #  - main
-     # - elizabeth #commenting out untl we can this out
+on:
+  push:
+    branches:
+      - main
+      - elizabeth
+      - xchen_descr_method 
 
-name: Test app w/ {renv}
+name: Test app w/ DESCRIPTION
 
 jobs:
   test-app:
@@ -34,11 +35,14 @@ jobs:
           r-version: ${{ matrix.config.r }}
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
-          
-      - uses: r-lib/actions/setup-renv@v2
 
-      - uses: rstudio/shinytest2/actions/test-app@v1
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages:
+            shinytest2
+      
+      - name: Test app (main)
+        uses: rstudio/shinytest2/actions/test-app@v1
         with:
           app-dir: "chip_invasion"
           upload-snapshots: true
-        
