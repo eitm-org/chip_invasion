@@ -31,7 +31,7 @@ shinyUI(fluidPage(
       tags$p("Data must be preprocessed using an image analysis tool. 
              Input files should contain the x, y, and z coordinates of the centroid of the endothelial objects and epithelial objects.
              Input files should cotain the Endothelial and Epithelial data as separate sheets in the same xlsx file.
-             Click 'Per-chip counts' to begin analysis. This can take up to several minutes.")
+             Test data is located here and can be used as a template: https://www.dropbox.com/scl/fi/fiic81rtbt1h89f0c4if8/test_template_data.xlsx?rlkey=ha6q0ncpafxc53i3jb5r97b4o&dl=0")
     )
   ),
   
@@ -40,7 +40,7 @@ shinyUI(fluidPage(
       style="color: #000; background-color: #FFE8F7; border-color: #8B1462",
       fileInput("gfp_huvec_upload", "Upload Endothelial and Epithelial data as separate sheets in the same xlsx file:"),
       tags$hr(style="color:#8B1462;"),
-      tags$p("Cell Counts"),
+      tags$p("Cell Counts - Click 'Per-chip counts' to begin analysis. This can take up to several minutes."),
       actionButton("runner", "Per-chip counts", icon = icon("dna"), class="btn btn-primary"),
       actionButton("perfield_runner", "Per-field counts", icon = icon("flask"), class="btn btn-primary"),
       tags$hr(style="color:#8B1462;"),
