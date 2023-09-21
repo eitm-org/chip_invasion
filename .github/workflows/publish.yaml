@@ -36,7 +36,7 @@ jobs:
         docker build . --tag ghcr.io/eitm-org/chip_invasion:latest
         docker push ghcr.io/eitm-org/chip_invasion:latest
     - name: Executing Remote Ssh Command to Pull Docker Image to shiny-apps
-      uses: appleboy/ssh-action@v1.0.0
+      uses: appleboy/ssh-action@master
       with:
         host: 158.101.15.103
         username: opc
