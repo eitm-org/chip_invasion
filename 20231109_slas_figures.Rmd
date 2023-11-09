@@ -1,0 +1,286 @@
+---
+title: "20231109_slas_figures"
+author: "Elizabeth Elton"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+source('chip_invasion/functions.R', local=TRUE)
+library(spam64)
+options(spam.force64 = TRUE)
+options(spam.nearestdistnnz=c(16016500,400))
+
+cute_surface_maker_newbie <- function(huvec_list, fit_list, chip_in, bottom_gfp_df) {
+  x_seq <- seq(0, max(huvec_list[[chip_in]]$position_x), len = 100)
+  y_seq <- seq(0, max(huvec_list[[chip_in]]$position_y), len = 100)  
+  
+  pos_grid <- expand.grid(x=x_seq, y=y_seq)
+  
+  fit_matrix <- matrix(predict(fit_list[[chip_in]], pos_grid), 100, 100) 
+  
+  chip_used <- bottom_gfp_df %>% filter(chip == chip_in)
+  
+  pos_x <- chip_used$position_x
+  new_x <- ((chip_used$position_x + abs(min(chip_used$position_x))) * (100/(abs(min(chip_used$position_x)) + max(chip_used$position_x))))  
+  pos_y <- chip_used$position_y
+  new_y <- ((chip_used$position_y + abs(min(chip_used$position_y))) * (100/(abs(min(chip_used$position_y)) + max(chip_used$position_y)))) 
+  pos_z <- chip_used$centroid_z
+  
+  plot_ly(z=fit_matrix, colors = plasma(n=257, begin = 0.25)) %>% 
+    add_surface(contours = list(
+    z = list(
+      show=TRUE,
+      usecolormap=TRUE,
+      highlightcolor="#406605",
+      project=list(z=TRUE), line = list(smoothing = 0.85)
+      )
+    )) %>%
+    add_trace(inherit = F, type = "scatter3d", mode="markers", x=new_y, y=new_x, z = pos_z, #swapping x and y bc surface seems to swap x and y?
+              marker = list(color = '#0571b0')) %>% layout(
+    scene = list(
+      xaxis = list(nticks = 20),
+      zaxis = list(nticks = 10),
+      camera = list(eye = list(x = 0, y = -1, z = 0.5)), 
+      aspectratio = list(x = 0.9, y = .8, z = 0.6))) %>% 
+    layout(title = "Object quantification using topographical surface method")
+}
+```
+
+## Figure 2
+```{r}
+# figure2_data <- endothelial_epithelial_reader(file.path(getwd(), "figure_2_ooc.xlsx"))
+# saveRDS(figure2_data, file = "figure2_data.RDS")
+figure2_data <- read_rds("figure2_data.RDS")
+
+fig2_epi <- figure2_data$organoid_df
+fig2_endo <- figure2_data$huvec_df
+```
+
+```{r}
+#tps boundary definition
+fig2_boundary <- endo_boundzer(huvec_df = fig2_endo,
+                                      organoid_df = fig2_epi)
+
+fig2_counts <- epi_count(fig2_boundary$org_fits_df)
+
+cute_surface_maker_newbie(fig2_boundary$huvec_list, fig2_boundary$fit_list, chip_in = 1, bottom_gfp_df = fig2_counts$all_gfp_bottom) #thats better - perhaps swap surface, not points?
+surface(fig2_boundary$fit_list$`1`, col = plasma(256), xlab = "X", ylab = "Y")
+```
+
+```{r}
+#mean height boundary definition
+mean_z_f2 <- mean(fig2_endo$centroid_z) # ~111
+se_z_f2 <- danGoat::sem(fig2_endo$centroid_z) # ~0.24
+ci_z_f2 <- se_z_f2*qnorm(0.975) # ~0.47
+
+fig2_bottom_channel <- fig2_counts$all_gfp_bottom 
+  
+figure2_belowmean <- fig2_bottom_channel %>% 
+  mutate(height = case_when(centroid_z < mean_z_f2 ~ "below",
+                            centroid_z > mean_z_f2 ~ "above"),
+         colors = case_when(centroid_z < mean_z_f2 ~ '#0571b0',
+                            centroid_z > mean_z_f2 ~ "#FF9800"),
+         y = ((fig2_bottom_channel$position_x + abs(min(fig2_bottom_channel$position_x))) * (100/(abs(min(fig2_bottom_channel$position_x)) + max(fig2_bottom_channel$position_x)))),
+         x = ((fig2_bottom_channel$position_y + abs(min(fig2_bottom_channel$position_y))) * (100/(abs(min(fig2_bottom_channel$position_y)) + max(fig2_bottom_channel$position_y)))),
+         z=centroid_z)
+  
+f2_zmatrix <- matrix(data = mean_z_f2, nrow=100, ncol = 100)
+
+  plot_ly() %>% 
+    add_surface(z=f2_zmatrix, colors = "plasma", opacity = 0.8, showlegend = FALSE) %>%
+    add_trace(type = "scatter3d", mode="markers",
+              data = figure2_belowmean, 
+              x=~x, y=~y, z = ~z,
+              marker = list(color = figure2_belowmean$colors,
+                            name = figure2_belowmean$height)
+              ) %>%
+    layout(
+      title = list(text = "Object quanitification using mean endothelial z-height", xanchor = 'center', yanchor = 'top'),
+    scene = list(
+      xaxis = list(nticks = 20),
+      zaxis = list(nticks = 10),
+      camera = list(eye = list(x = 0, y = -1, z = 0.5)), 
+      aspectratio = list(x = 0.9, y = .8, z = 0.5)))
+```
+
+```{r}
+#scatterplot of where each cell is on the x-y plane
+ggplot(fig2_bottom_channel, aes(x = position_x, y = position_y)) + 
+  geom_point(size = 5) + 
+  xlab("X") +
+  ylab("Y") +
+  labs(title = "XY Position Plot")  +
+  theme_bw() +
+  theme(text=element_text(size=25))
+ggsave(filename = "figure2_xy_position_plot.tiff", width = 18, height = 7.5)
+
+
+#scatterplot of where each cell is on the x-z axis
+ggplot(fig2_bottom_channel, aes(x = position_x, y = centroid_z)) + 
+  geom_point(size = 5) + 
+  scale_y_continuous(breaks=seq(-50,150,50)) +
+  xlab("X") +
+  ylab("Z") +
+  labs(title = "XZ Position Plot")  +
+  theme_bw() +
+  theme(text=element_text(size=25))
+ggsave(filename = "figure2_xz_position_plot.tiff", width = 18, height = 7.5)
+
+```
+
+## Figure 3
+
+#Day 6 single cell US HUVECS, 1-2 stretched
+```{r}
+# day6_0328_huvec <- endothelial_epithelial_reader("/Users/eelton/Documents/chip_invasion/20220328_D6_Chips1-4_DataAnalysis.xlsx")
+figure3_huend6 <- day6_0328_huvec$huvec_df %>%
+  filter(chip %in% c(1,2))
+figure3_huepi6 <- day6_0328_huvec$organoid_df %>%
+  filter(chip %in% c(1,2))
+saveRDS(figure3_huend6, file = "figure3_huvec_endo_day6.RDS")
+saveRDS(figure3_huepi6, file = "figure3_huvec_epi_day6.RDS")
+
+figure3_huend6 <- read_rds("figure3_huvec_endo_day6.RDS")
+figure3_huepi6 <- read_rds("figure3_huvec_epi_day6.RDS")
+
+day6_boundary_huvec <- endo_boundzer(huvec_df = figure3_huend6,
+                                      organoid_df = figure3_huepi6)
+
+day6_count_huvec <- epi_count(day6_boundary_huvec$org_fits_df)
+
+huvec_d6_counts <- day6_count_huvec$gfp_per_chip_bottom %>%
+  mutate(endothelial_cell = "huvecs",
+         day = "day6",
+         organoid = "us",
+         seeding = "single cell",
+         stretch = case_when(chip %in% c("1", "2") ~ "stretch",
+                            .default = "no stretch"))
+
+cute_surface_maker_newbie(day6_boundary_huvec$huvec_list, day6_boundary_huvec$fit_list, chip_in = 1, bottom_gfp_df = day6_count_huvec$all_gfp_bottom) 
+
+surface(day6_boundary_huvec$fit_list$`1`, col = plasma(256))
+```
+
+#2023-03-28 Day 6 single cell US HIMECS, 5-6 stretched
+```{r}
+# day6_0328_himec <- endothelial_epithelial_reader("/Users/eelton/Documents/chip_invasion/20220328_D6_Chips5-8_DataAnalysis.xlsx")
+figure3_himend6 <- day6_0328_himec$huvec_df %>%
+  filter(chip %in% c(5,6))
+figure3_himepi6 <- day6_0328_himec$organoid_df %>%
+  filter(chip %in% c(5,6))
+saveRDS(figure3_himend6, file = "figure3_himec_endo_day6.RDS")
+saveRDS(figure3_himepi6, file = "figure3_himec_epi_day6.RDS")
+
+figure3_himend6 <- readRDS("figure3_himec_endo_day6.RDS")
+figure3_himepi6 <- readRDS("figure3_himec_epi_day6.RDS")
+
+himec_df_d6 <- figure3_himend6 %>%
+   mutate(chip = case_when(chip == "5" ~ 1,
+                          chip == "6" ~ 2))
+
+org_df_d6 <- figure3_himepi6 %>%
+  mutate( chip = case_when(chip == "5" ~ 1,
+                          chip == "6" ~ 2))
+
+day6_boundary_himec <- endo_boundzer(huvec_df = himec_df_d6,
+                                      organoid_df = org_df_d6)
+
+day6_count_himec <- epi_count(day6_boundary_himec$org_fits_df)
+
+himec_d6_counts <- day6_count_himec$gfp_per_chip_bottom %>%
+  mutate(endothelial_cell = "himecs",
+         day = "day6",
+         organoid = "us",
+         seeding = "single cell",
+         stretch = case_when(chip %in% c("1", "2") ~ "stretch",
+                            .default = "no stretch"))
+
+cute_surface_maker_newbie(day6_boundary_himec$huvec_list, day6_boundary_himec$fit_list, chip_in = 2, bottom_gfp_df = day6_count_himec$all_gfp_bottom)  
+surface(day6_boundary_himec$fit_list$`2`, col = plasma(256, begin = 0.25), type = "C")
+```
+
+#huvec day 0
+```{r}
+day0_0328_huvec <- endothelial_epithelial_reader("/Users/eelton/Documents/chip_invasion/20220328_D0_Chips1-4_DataAnalysis.xlsx")
+figure3_huend0 <- day0_0328_huvec$huvec_df %>%
+  filter(chip %in% c(1,2))
+figure3_humepi0 <- day0_0328_huvec$organoid_df %>%
+  filter(chip %in% c(1,2))
+saveRDS(figure3_huend0, file = "figure3_huvec_endo_day0.RDS")
+saveRDS(figure3_humepi0, file = "figure3_huvec_epi_day0.RDS")
+
+figure3_huend0 <- readRDS("figure3_himec_endo_day0.RDS")
+figure3_humepi0 <- readRDS("figure3_himec_epi_day0.RDS")
+
+
+day0_boundary_huvec <- endo_boundzer(huvec_df = figure3_huend0,
+                                      organoid_df = figure3_humepi0)
+
+day0_count_huvec <- epi_count(day0_boundary_huvec$org_fits_df)
+
+huvec_day0_counts <- day0_boundary_huvec$gfp_per_chip_bottom %>%
+  mutate(endothelial_cell = "huvecs",
+         day = "day0",
+         organoid = "us",
+         seeding = "single cell",
+         stretch = case_when(chip %in% c("1", "2") ~ "stretch",
+                            .default = "no stretch"))
+
+```
+
+#himec day 0
+```{r}
+day0_0328_himec <- endothelial_epithelial_reader("/Users/eelton/Documents/chip_invasion/20220328_D0_Chips5-8_DataAnalysis.xlsx")
+figure3_himend0 <- day0_0328_himec$huvec_df %>%
+  filter(chip %in% c(5,6))
+figure3_himepi0 <- day0_0328_himec$organoid_df %>%
+  filter(chip %in% c(5,6))
+saveRDS(figure3_himend0, file = "figure3_himec_endo_day0.RDS")
+saveRDS(figure3_himepi0, file = "figure3_himec_epi_day0.RDS")
+
+figure3_himend0 <- readRDS("figure3_himec_endo_day0.RDS")
+figure3_himepi0 <- readRDS("figure3_himec_epi_day0.RDS")
+
+himec_df_d0_f1 <- figure3_himend0 %>%
+   mutate( chip = case_when(chip == "5" ~ 1,
+                          chip == "6" ~ 2)) 
+
+org_df_d0_f1 <- figure3_himepi0 %>%
+  mutate( chip = case_when(chip == "5" ~ 1,
+                          chip == "6" ~ 2))
+
+day0_boundary_himec <- endo_boundzer(huvec_df = himec_df_d0_f1,
+                                      organoid_df = org_df_d0_f1)
+
+day0_count_himec <- epi_count(day0_boundary_himec$org_fits_df)
+
+himec_day0_counts <- day0_count_himec$gfp_per_chip_bottom %>%
+  mutate(endothelial_cell = "himecs",
+         day = "day0",
+         organoid = "us",
+         seeding = "single cell",
+         stretch = case_when(chip %in% c("1", "2") ~ "stretch",
+                            .default = "no stretch"))
+```
+
+```{r}
+endo_df <- bind_rows(huvec_d6_counts, himec_d6_counts, huvec_day0_counts, himec_day0_counts) %>%
+  filter(stretch == "stretch") %>%
+  mutate(endothelial_cell = case_when(endothelial_cell == "huvecs" ~ "HUVECs",
+                                      endothelial_cell == "himecs" ~ "HIMECs")) %>%
+  dplyr::rename("Day" = day,
+                "GFP Cells in Bottom Channel" = gfp_cells_in_bottom)
+
+endo_plot <- ggplot(endo_df, aes(x=Day, y=`GFP Cells in Bottom Channel`, color = Day)) +
+  geom_boxplot(size = 2) +
+  geom_beeswarm(dodge.width = 0.75, size=8) +
+  theme_bw(base_size = 30) +
+  facet_wrap(forcats::fct_relevel(endo_df$endothelial_cell, "HUVECs", "HIMECs")) +
+  scale_color_viridis(discrete = TRUE, begin = 0.3, end = 0.7, option = "C")
+endo_plot
+
+ggsave("endothelial_invasion_box.tiff", width = 20, height = 6)
+```
