@@ -31,7 +31,9 @@ shinyUI(fluidPage(
       tags$p("Data must be preprocessed using an image analysis tool. 
              Input files should contain the x, y, and z coordinates of the centroid of the endothelial objects and epithelial objects.
              Input files should cotain the Endothelial and Epithelial data as separate sheets in the same xlsx file.
-             Test data is located here and can be used as a template: https://www.dropbox.com/scl/fi/fiic81rtbt1h89f0c4if8/test_template_data.xlsx?rlkey=ha6q0ncpafxc53i3jb5r97b4o&dl=0")
+             Example data below can be used as a template."),
+      tags$a(href="test_data.xlsx", "Download Example", download=NA, target="_blank"),
+     # downloadButton("downloadbutton", "Download Report")
     )
   ),
   

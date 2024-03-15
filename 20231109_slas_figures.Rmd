@@ -7,12 +7,9 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-
 source('chip_invasion/functions.R', local=TRUE)
-# library(spam64)
-# options(spam.force64 = TRUE)
-# options(spam.nearestdistnnz=c(16016500,400))
 
+#function to make the tps surface + points plot
 cute_surface_maker_newbie <- function(huvec_list, fit_list, chip_in, bottom_gfp_df) {
   x_seq <- seq(0, max(huvec_list[[chip_in]]$position_x), len = 100)
   y_seq <- seq(0, max(huvec_list[[chip_in]]$position_y), len = 100)  
@@ -23,13 +20,14 @@ cute_surface_maker_newbie <- function(huvec_list, fit_list, chip_in, bottom_gfp_
   
   chip_used <- bottom_gfp_df %>% filter(chip == chip_in)
   
+  #scale the x and y object positions so they fit on a 100x100 grid with the surface
   pos_x <- chip_used$position_x
   new_x <- ((chip_used$position_x + abs(min(chip_used$position_x))) * (100/(abs(min(chip_used$position_x)) + max(chip_used$position_x))))  
   pos_y <- chip_used$position_y
   new_y <- ((chip_used$position_y + abs(min(chip_used$position_y))) * (100/(abs(min(chip_used$position_y)) + max(chip_used$position_y)))) 
   pos_z <- chip_used$centroid_z
   
-  plot_ly(z=fit_matrix, colors = plasma(n=257, begin = 0.25)) %>% 
+  plot_ly(z=fit_matrix, colors = plasma(n=257, begin = 0.25), scene='scene1') %>% 
     add_surface(contours = list(
     z = list(
       show=TRUE,
@@ -38,27 +36,18 @@ cute_surface_maker_newbie <- function(huvec_list, fit_list, chip_in, bottom_gfp_
       project=list(z=TRUE), line = list(smoothing = 0.85)
       )
     )) %>%
-    add_trace(inherit = F, type = "scatter3d", mode="markers", x=new_y, y=new_x, z = pos_z, #swapping x and y bc surface seems to swap x and y?
-              marker = list(color = '#0571b0')) %>% layout(
+    add_trace(inherit = F, type = "scatter3d", mode="markers", x=new_y, y=new_x, z = pos_z, #swapping x and y bc surface seems to swap x and y
+              marker = list(color = '#0571b0')) %>% 
+    layout(
     scene = list(
       xaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
       yaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
       zaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
-     # legend = list(title=list(text='<b> Z-height </b>')),
-      camera = list(eye = list(x = 0, y = -1, z = 0.5)), 
-      aspectratio = list(x = 0.9, y = .8, z = 0.6))) %>% 
+      camera = list(eye = list(x = 0, y = -1, z = 0.5)),
+      aspectratio = list(x = 0.9, y = .8, z = 0.6))) %>%
     layout(title = "Object quantification using topographical surface method")
 }
 ```
-
-## weird stuff
-```{r}
-testdata <- endothelial_epithelial_reader(data_path = "/Users/eelton/Documents/chip_invasion/chip_invasion/tests/testthat/test_data.xlsx")
-testhuvec <- testdata$huvec_df %>% select(-c(concentration, cell_count, cell_type))
-testorg <- testdata$organoid_df %>% select(-c(concentration, cell_count, cell_type)) 
-testbound <- endo_boundzer(huvec_df = testhuvec, organoid_df = testorg) #WHY
-```
-
 
 ## Figure 2
 ```{r}
@@ -69,25 +58,94 @@ figure2_data <- read_rds("figure2_data.RDS")
 fig2_epi <- figure2_data$organoid_df
 fig2_endo <- figure2_data$huvec_df
 ```
+```{r}
+#create the surface plot (fig2a)
+
+#tiff("test.tiff", units="in", width=5, height=5, res=300)
+surface(fig2_boundary$fit_list$`1`, col = plasma(256), 
+        xlab = "X", 
+        ylab = "",
+        cex.lab = 1.5,
+        main = "Endothelial Surface", 
+        axis.args = list(cex.axis=1),
+        legend.args = list(text = "Z-height", cex = 1.25, side = 3, line = 0.5)) 
+title(ylab = "Y", line = 2.5, cex.lab = 1.5)
+#dev.off()
+
+```
 
 ```{r}
-#tps boundary definition
+#figure 2b - topographical surface + invaded objects
 fig2_boundary <- endo_boundzer(huvec_df = fig2_endo,
                                       organoid_df = fig2_epi)
 
 fig2_counts <- epi_count(fig2_boundary$org_fits_df)
 
-cute_surface_maker_newbie(fig2_boundary$huvec_list, fig2_boundary$fit_list, chip_in = 1, bottom_gfp_df = fig2_counts$all_gfp_bottom)
-#thats better - perhaps swap surface, not points?
-#fields.style() 
-surface(fig2_boundary$fit_list$`1`, col = plasma(256), xlab = "X", ylab = "Y", 
-        #legend.lab = "Z-height", 
-        main = "Endothelial Surface", 
-        legend.args = list(text = "Z-height", cex = 1.25, side = 3, line = 0.5)) 
+fig2_b3 <- cute_surface_maker_newbie(fig2_boundary$huvec_list, fig2_boundary$fit_list, chip_in = 1, bottom_gfp_df = fig2_counts$all_gfp_bottom)
+fig2_b3
 ```
 
 ```{r}
-#mean height boundary definition
+#figure 2b - flat plane + invaded points. objects of 'disagreement' are orange
+#to fit a flat plane, fit a tps with mimimal taper (aRange=1)
+fig2_flat_plane <- endo_boundzer(huvec_df = fig2_endo, organoid_df = fig2_epi, aRange = 0.1)
+
+fig2_counts_fp <- epi_count(fig2_flat_plane$org_fits_df)
+
+overlapping_orgs <- dplyr::intersect(fig2_counts$all_gfp_bottom[,1:43], fig2_counts_fp$all_gfp_bottom[,1:43]) %>% mutate(colors = '#0571b0',
+         y = ((overlapping_orgs$position_x + abs(min(overlapping_orgs$position_x))) * (100/(abs(min(overlapping_orgs$position_x)) + max(overlapping_orgs$position_x)))),
+         x = ((overlapping_orgs$position_y + abs(min(overlapping_orgs$position_y))) * (100/(abs(min(overlapping_orgs$position_y)) + max(overlapping_orgs$position_y)))),
+         z=centroid_z)
+#221 shared
+unique_orgs <- dplyr::setdiff(fig2_counts$all_gfp_bottom[,1:43], fig2_counts_fp$all_gfp_bottom[,1:43])%>% mutate(colors = '#FF9800',
+         y = ((unique_orgs$position_x + abs(min(unique_orgs$position_x))) * (100/(abs(min(unique_orgs$position_x)) + max(unique_orgs$position_x)))),
+         x = ((unique_orgs$position_y + abs(min(unique_orgs$position_y))) * (100/(abs(min(unique_orgs$position_y)) + max(unique_orgs$position_y)))),
+         z=centroid_z)
+
+# unique_to_fp <- dplyr::setdiff(fig2_counts_fp$all_gfp_bottom[,1:43], fig2_counts$all_gfp_bottom[,1:43]) %>% mutate(colors = 'gray',
+#          y = ((unique_to_fp$position_x + abs(min(unique_to_fp$position_x))) * (100/(abs(min(unique_to_fp$position_x)) + max(unique_to_fp$position_x)))),
+#          x = ((unique_to_fp$position_y + abs(min(unique_to_fp$position_y))) * (100/(abs(min(unique_to_fp$position_y)) + max(unique_to_fp$position_y)))),
+#          z=centroid_z)
+
+orgs_with_color <- bind_rows(overlapping_orgs, unique_orgs, 
+                             #unique_to_fp
+                             )
+
+#unique_to_fp <- dplyr::setdiff(fig2_counts_fp$all_gfp_bottom[,1:43], fig2_counts$all_gfp_bottom[,1:43])
+#bro there are so many of you 
+#cute_surface_maker_newbie(fig2_flat_plane$huvec_list, fig2_flat_plane$fit_list, chip_in = 1, bottom_gfp_df = fig2_counts$all_gfp_bottom)
+
+#fig2_counts$gfp_per_chip_bottom
+#fig2_counts_fp$gfp_per_chip_bottom
+
+x_seq <- seq(0, max(fig2_flat_plane$huvec_list[[1]]$position_x), len = 100)
+y_seq <- seq(0, max(fig2_flat_plane$huvec_list[[1]]$position_y), len = 100)  
+  
+pos_grid <- expand.grid(x=x_seq, y=y_seq)
+  
+fit_matrix <- matrix(predict(fig2_flat_plane$fit_list[[1]], pos_grid), 100, 100) 
+
+fig2_b2 <- plot_ly(scene="scene2") %>% 
+    add_surface(z=fit_matrix, colors = "plasma", opacity = 0.8, showscale = FALSE) %>%
+    layout(showlegend=FALSE) %>%
+    add_trace(type = "scatter3d", mode="markers",
+              data = orgs_with_color, 
+              x=~x, y=~y, z = ~z,
+              marker = list(color = orgs_with_color$colors)
+              ) %>%
+    layout(showlegend=FALSE,
+      title = list(text = "Object quanitification using flat plane", xanchor = 'center', yanchor = 'top'),
+    scene2 = list(
+      xaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
+      yaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
+      zaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
+      camera = list(eye = list(x = 0, y = -1, z = 0.5)), 
+      aspectratio = list(x = 0.9, y = .8, z = 0.5))) 
+fig2_b2
+```
+
+```{r}
+#figure 2b - constant height boundary definition
 mean_z_f2 <- mean(fig2_endo$centroid_z) # ~111
 se_z_f2 <- danGoat::sem(fig2_endo$centroid_z) # ~0.24
 ci_z_f2 <- se_z_f2*qnorm(0.975) # ~0.47
@@ -105,25 +163,57 @@ figure2_belowmean <- fig2_bottom_channel %>%
   
 f2_zmatrix <- matrix(data = mean_z_f2, nrow=100, ncol = 100)
 
-  plot_ly() %>% 
-    add_surface(z=f2_zmatrix, colors = "plasma", opacity = 0.8, showlegend = FALSE) %>%
+fig2_b1 <- plot_ly(scene="scene3") %>% 
+    add_surface(z=f2_zmatrix, colors = "plasma", opacity = 0.8, showscale = FALSE) %>%
+    layout(showlegend=FALSE) %>%
     add_trace(type = "scatter3d", mode="markers",
               data = figure2_belowmean, 
               x=~x, y=~y, z = ~z,
               marker = list(color = figure2_belowmean$colors,
                             name = figure2_belowmean$height)
               ) %>%
-    layout(
+    layout(showlegend=FALSE,
       title = list(text = "Object quanitification using mean endothelial z-height", xanchor = 'center', yanchor = 'top'),
-    scene = list(
+    scene3 = list(
       xaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
       yaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
       zaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
       camera = list(eye = list(x = 0, y = -1, z = 0.5)), 
-      aspectratio = list(x = 0.9, y = .8, z = 0.5)))
+      aspectratio = list(x = 0.9, y = .8, z = 0.5))) 
+
+fig2_b1
 ```
 
 ```{r}
+#figure 2b - put the surface plots side by side
+fig <- subplot(fig2_b1, fig2_b2, fig2_b3, margin = 0)
+
+axx <- list(
+  gridcolor='darkgray',
+  zerolinecolor='darkgray',
+  showbackground=TRUE,
+  backgroundcolor='white'
+)
+ 
+fig <- fig %>% layout(title = "3D Subplots",
+         scene = list(domain=list(x=c(0.66,1),y=c(0,1)),
+                      xaxis=axx, yaxis=axx, zaxis=axx,
+                      aspectmode='cube'),
+         scene2 = list(domain=list(x=c(0.0,0.5),y=c(0,1)),
+                       xaxis=axx, yaxis=axx, zaxis=axx,
+                       aspectmode='cube'),
+         scene3 = list(domain=list(x=c(0,0.5),y=c(0.5,1)),
+                       xaxis=axx, yaxis=axx, zaxis=axx,
+                       aspectmode='cube'))
+
+fig
+
+#htmlwidgets::saveWidget(fig, file = "fig2_surface.html")
+```
+
+
+```{r}
+#figure 2c
 #scatterplot of where each cell is on the x-y plane
 ggplot(fig2_bottom_channel, aes(x = position_x, y = position_y)) + 
   geom_point(size = 5) + 
@@ -132,7 +222,7 @@ ggplot(fig2_bottom_channel, aes(x = position_x, y = position_y)) +
   labs(title = "XY Position Plot")  +
   theme_bw() +
   theme(text=element_text(size=35))
-ggsave(filename = "figure2_xy_position_plot.tiff", width = 18, height = 7.5)
+#ggsave(filename = "figure2_xy_position_plot.tiff", width = 18, height = 7.5)
 
 
 #scatterplot of where each cell is on the x-z axis
@@ -144,13 +234,13 @@ ggplot(fig2_bottom_channel, aes(x = position_x, y = centroid_z)) +
   labs(title = "XZ Position Plot")  +
   theme_bw() +
   theme(text=element_text(size=35))
-ggsave(filename = "figure2_xz_position_plot.tiff", width = 18, height = 7.5)
+#ggsave(filename = "figure2_xz_position_plot.tiff", width = 18, height = 7.5)
 
 ```
 
 ## Figure 3
 
-#Day 6 single cell US HUVECS, 1-2 stretched
+#HUVECS D6
 ```{r}
 # day6_0328_huvec <- endothelial_epithelial_reader("/Users/eelton/Documents/chip_invasion/20220328_D6_Chips1-4_DataAnalysis.xlsx")
 # figure3_huend6 <- day6_0328_huvec$huvec_df %>%
@@ -181,7 +271,7 @@ cute_surface_maker_newbie(day6_boundary_huvec$huvec_list, day6_boundary_huvec$fi
 surface(day6_boundary_huvec$fit_list$`1`, col = plasma(256))
 ```
 
-#2023-03-28 Day 6 single cell US HIMECS, 5-6 stretched
+#HIMECS D6
 ```{r}
 # day6_0328_himec <- endothelial_epithelial_reader("/Users/eelton/Documents/chip_invasion/20220328_D6_Chips5-8_DataAnalysis.xlsx")
 # figure3_himend6 <- day6_0328_himec$huvec_df %>%
@@ -284,6 +374,7 @@ himec_day0_counts <- day0_count_himec$gfp_per_chip_bottom %>%
 ```
 
 ```{r}
+#figure 3c
 endo_df <- bind_rows(huvec_d6_counts, himec_d6_counts, huvec_day0_counts, himec_day0_counts) %>%
   filter(stretch == "stretch") %>%
   mutate(endothelial_cell = case_when(endothelial_cell == "huvecs" ~ "HUVECs",
@@ -299,5 +390,5 @@ endo_plot <- ggplot(endo_df, aes(x=Day, y=`GFP Cells in Bottom Channel`, color =
   scale_color_viridis(discrete = TRUE, begin = 0.3, end = 0.7, option = "C")
 endo_plot
 
-ggsave("endothelial_invasion_box.tiff", width = 20, height = 6)
+#ggsave("endothelial_invasion_box.tiff", width = 20, height = 6)
 ```
