@@ -8,8 +8,8 @@ library(readxl)
 library(hablar)
 library(ggbeeswarm)
 library(plotly)
-library(FactoMineR)
-library(factoextra)
+#library(FactoMineR)
+#library(factoextra)
 library(fields)
 cwd <- here::here()
 
@@ -60,54 +60,48 @@ diagnostic_plots_ee <- function(huvec_df, organoid_df) {
 }
 
 #define the z-boundary using endothelial cells
-endo_boundzer <- function(huvec_df, organoid_df) {
+endo_boundzer <- function(huvec_df, organoid_df, aRange = 200) {
   #browser()
   endo_chip_list <- split(huvec_df, f=huvec_df$chip)
   epi_chip_list <- split(organoid_df, f=organoid_df$chip)
   
   org_positions <- lapply(epi_chip_list, function(x) dplyr::select(x, position_x, position_y))
   
-  endo_fits <- lapply(endo_chip_list, function(x) fastTps(x[, c("position_x", "position_y")], Y=x$centroid_z, aRange = 200)) 
+  endo_fits <- lapply(endo_chip_list, function(x) fastTps(x[, c("position_x", "position_y")], Y=x$centroid_z, aRange = aRange)) 
   
-  se_endo_fits <- lapply(endo_fits, function(x) predictSE(x))
-  avg_se_fits <- lapply(se_endo_fits, function(x) mean(x)*qnorm(0.975)) #top half of the ci around the fitted surface
-  ses_together <- bind_rows(avg_se_fits) %>%
-    pivot_longer(cols = everything(), names_to = "chip", values_to = "se") %>% #damn it
-    mutate(chip = as.double(chip))
+   se_endo_fits <- lapply(endo_fits, function(x) predictSE(x))
+   avg_se_fits <- lapply(se_endo_fits, function(x) mean(x)*qnorm(0.975)) #ci around the fitted surface
+   ses_together <- bind_rows(avg_se_fits) %>%
+     pivot_longer(cols = everything(), names_to = "chip", values_to = "se") %>% 
+     mutate(chip = as.double(chip))
   
   pred_fits <- map2(.x=endo_fits, .y=org_positions, ~predict(.x, .y))
   org_fits <- map2(.x=epi_chip_list, .y=pred_fits, ~cbind(.x, .y))
   org_fits_clean <- lapply(org_fits, function(x) rename(x, "gfp_pred"=.y))
   
-  ## split off here in some way
+
   org_fits_joined <- bind_rows(org_fits_clean) %>% 
-    left_join(ses_together, by="chip") #%>%
-  # group_by(chip) %>%
-  # mutate(below_pred = centroid_z < (gfp_pred+se)) %>%
-  # filter(below_pred == TRUE)
-  
-  #todo: make a summry table of zheights? idk how that would work here
+    left_join(ses_together, by="chip") 
   
   stuff_to_return <- list("huvec_list" = endo_chip_list, 
                           "org_list" = epi_chip_list, 
                           "fit_list" = endo_fits, 
-                          "org_fits_df" = org_fits_joined)
+                          "org_fits_df" = org_fits_joined
+                          )
   
   return(stuff_to_return)
 }
 
 #count cells in the bottom channel
 epi_count <- function(org_fits_df) {
-  
+  #browser()
   filtered_gfp <- org_fits_df %>%
+   # filter(intensity_488_cv_percent > 10,
+    #       intensity_488_std_dev > 200) %>% #adds for wack harmony
     group_by(chip) %>%
     mutate(boundary = gfp_pred+se,
            in_bottom_channel = centroid_z < boundary,
            in_top_channel = centroid_z > boundary) 
-  
-  # full_join(organoid_df, field_chip_huvec) %>% 
-  # mutate(in_bottom_channel = centroid_z < mean_huvec_offset) %>% 
-  # mutate(in_top_channel = centroid_z > mean_huvec_offset)
   
   gfp_in_bottom_channel <- filtered_gfp %>%
     filter(in_bottom_channel == TRUE) %>%
@@ -204,9 +198,6 @@ cute_surface_maker <- function(huvec_list, fit_list, chip) {
   
   plot_ly(z=fit_matrix, colors = "plasma") %>% 
     add_surface()
-  
-  #return(cute_surface)
-  
 }
 
 #create a 3d plot of the bottom channel

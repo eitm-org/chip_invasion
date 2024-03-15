@@ -13,7 +13,5 @@ Imports:
     hablar,
     ggbeeswarm,
     plotly,
-    FactoMineR,
-    factoextra,
     fields,
     bslib
