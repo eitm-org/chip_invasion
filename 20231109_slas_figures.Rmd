@@ -36,13 +36,13 @@ cute_surface_maker_newbie <- function(huvec_list, fit_list, chip_in, bottom_gfp_
       project=list(z=TRUE), line = list(smoothing = 0.85)
       )
     )) %>%
-    add_trace(inherit = F, type = "scatter3d", mode="markers", x=new_y, y=new_x, z = pos_z, #swapping x and y bc surface seems to swap x and y
+    add_trace(inherit = F, type = "scatter3d", mode="markers", x=new_y, y=new_x, z = pos_z, #swapping x and y bc surface matrix seems to swap x and y
               marker = list(color = '#0571b0')) %>% 
     layout(
     scene = list(
-      xaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
-      yaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
-      zaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
+      xaxis = list(nticks = 10, titlefont=list(size=50), tickfont=list(size=20)),
+      yaxis = list(nticks = 10, titlefont=list(size=50), tickfont=list(size=20)),
+      zaxis = list(nticks = 10, titlefont=list(size=50), tickfont=list(size=20)),
       camera = list(eye = list(x = 0, y = -1, z = 0.5)),
       aspectratio = list(x = 0.9, y = .8, z = 0.6))) %>%
     layout(title = "Object quantification using topographical surface method")
@@ -92,31 +92,18 @@ fig2_flat_plane <- endo_boundzer(huvec_df = fig2_endo, organoid_df = fig2_epi, a
 
 fig2_counts_fp <- epi_count(fig2_flat_plane$org_fits_df)
 
-overlapping_orgs <- dplyr::intersect(fig2_counts$all_gfp_bottom[,1:43], fig2_counts_fp$all_gfp_bottom[,1:43]) %>% mutate(colors = '#0571b0',
-         y = ((overlapping_orgs$position_x + abs(min(overlapping_orgs$position_x))) * (100/(abs(min(overlapping_orgs$position_x)) + max(overlapping_orgs$position_x)))),
-         x = ((overlapping_orgs$position_y + abs(min(overlapping_orgs$position_y))) * (100/(abs(min(overlapping_orgs$position_y)) + max(overlapping_orgs$position_y)))),
+overlapping_orgs <- dplyr::intersect(fig2_counts$all_gfp_bottom[,1:43], fig2_counts_fp$all_gfp_bottom[,1:43]) %>% mutate(colors = '#0571b0')
+
+unique_orgs <- dplyr::setdiff(fig2_counts$all_gfp_bottom[,1:43], fig2_counts_fp$all_gfp_bottom[,1:43])%>% mutate(colors = '#FF9800')
+
+unique_to_fp <- dplyr::setdiff(fig2_counts_fp$all_gfp_bottom[,1:43], overlapping_orgs[,1:43]) %>% mutate(colors = '#FF9800')
+
+orgs_with_color <- bind_rows(overlapping_orgs, unique_orgs, unique_to_fp)
+
+orgs_with_color <- orgs_with_color %>%
+  mutate(y = ((orgs_with_color$position_x + abs(min(orgs_with_color$position_x))) * (100/(abs(min(orgs_with_color$position_x)) + max(orgs_with_color$position_x)))),
+         x = ((orgs_with_color$position_y + abs(min(orgs_with_color$position_y))) * (100/(abs(min(orgs_with_color$position_y)) + max(orgs_with_color$position_y)))),
          z=centroid_z)
-#221 shared
-unique_orgs <- dplyr::setdiff(fig2_counts$all_gfp_bottom[,1:43], fig2_counts_fp$all_gfp_bottom[,1:43])%>% mutate(colors = '#FF9800',
-         y = ((unique_orgs$position_x + abs(min(unique_orgs$position_x))) * (100/(abs(min(unique_orgs$position_x)) + max(unique_orgs$position_x)))),
-         x = ((unique_orgs$position_y + abs(min(unique_orgs$position_y))) * (100/(abs(min(unique_orgs$position_y)) + max(unique_orgs$position_y)))),
-         z=centroid_z)
-
-# unique_to_fp <- dplyr::setdiff(fig2_counts_fp$all_gfp_bottom[,1:43], fig2_counts$all_gfp_bottom[,1:43]) %>% mutate(colors = 'gray',
-#          y = ((unique_to_fp$position_x + abs(min(unique_to_fp$position_x))) * (100/(abs(min(unique_to_fp$position_x)) + max(unique_to_fp$position_x)))),
-#          x = ((unique_to_fp$position_y + abs(min(unique_to_fp$position_y))) * (100/(abs(min(unique_to_fp$position_y)) + max(unique_to_fp$position_y)))),
-#          z=centroid_z)
-
-orgs_with_color <- bind_rows(overlapping_orgs, unique_orgs, 
-                             #unique_to_fp
-                             )
-
-#unique_to_fp <- dplyr::setdiff(fig2_counts_fp$all_gfp_bottom[,1:43], fig2_counts$all_gfp_bottom[,1:43])
-#bro there are so many of you 
-#cute_surface_maker_newbie(fig2_flat_plane$huvec_list, fig2_flat_plane$fit_list, chip_in = 1, bottom_gfp_df = fig2_counts$all_gfp_bottom)
-
-#fig2_counts$gfp_per_chip_bottom
-#fig2_counts_fp$gfp_per_chip_bottom
 
 x_seq <- seq(0, max(fig2_flat_plane$huvec_list[[1]]$position_x), len = 100)
 y_seq <- seq(0, max(fig2_flat_plane$huvec_list[[1]]$position_y), len = 100)  
@@ -136,9 +123,9 @@ fig2_b2 <- plot_ly(scene="scene2") %>%
     layout(showlegend=FALSE,
       title = list(text = "Object quanitification using flat plane", xanchor = 'center', yanchor = 'top'),
     scene2 = list(
-      xaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
-      yaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
-      zaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
+      xaxis = list(nticks = 10, titlefont=list(size=50), tickfont=list(size=20)),
+      yaxis = list(nticks = 10, titlefont=list(size=50), tickfont=list(size=20)),
+      zaxis = list(nticks = 10, titlefont=list(size=50), tickfont=list(size=20)),
       camera = list(eye = list(x = 0, y = -1, z = 0.5)), 
       aspectratio = list(x = 0.9, y = .8, z = 0.5))) 
 fig2_b2
@@ -150,15 +137,26 @@ mean_z_f2 <- mean(fig2_endo$centroid_z) # ~111
 se_z_f2 <- danGoat::sem(fig2_endo$centroid_z) # ~0.24
 ci_z_f2 <- se_z_f2*qnorm(0.975) # ~0.47
 
-fig2_bottom_channel <- fig2_counts$all_gfp_bottom 
-  
-figure2_belowmean <- fig2_bottom_channel %>% 
-  mutate(height = case_when(centroid_z < mean_z_f2 ~ "below",
-                            centroid_z > mean_z_f2 ~ "above"),
-         colors = case_when(centroid_z < mean_z_f2 ~ '#0571b0',
-                            centroid_z > mean_z_f2 ~ "#FF9800"),
-         y = ((fig2_bottom_channel$position_x + abs(min(fig2_bottom_channel$position_x))) * (100/(abs(min(fig2_bottom_channel$position_x)) + max(fig2_bottom_channel$position_x)))),
-         x = ((fig2_bottom_channel$position_y + abs(min(fig2_bottom_channel$position_y))) * (100/(abs(min(fig2_bottom_channel$position_y)) + max(fig2_bottom_channel$position_y)))),
+bound <- mean_z_f2 + ci_z_f2
+
+fig2_constant_height <- fig2_epi %>% 
+  filter(centroid_z < bound) %>%
+  mutate(chip = as.factor(chip),
+         field = as.factor(field))
+
+fig2_overlapping <- dplyr::intersect(fig2_counts$all_gfp_bottom[,1:43], fig2_constant_height[,1:43]) %>% 
+  mutate(colors = '#0571b0') #orgs where the methods agree
+
+fig2_undercount <- dplyr::setdiff(fig2_counts$all_gfp_bottom[,1:43], fig2_constant_height[,1:43])%>% 
+  mutate(colors = '#FF9800') #orgs that tps method captures, but constant height doesnt
+
+fig2_overcount <- dplyr::setdiff(fig2_constant_height[,1:43], fig2_overlapping[,1:43]) %>% 
+  mutate(colors = '#FF9800') #orgs that constant height counts, but tps doesnt
+
+miscounts_w_color <- bind_rows(fig2_overlapping, fig2_undercount, fig2_overcount)
+miscounts_w_color <- miscounts_w_color %>%
+  mutate(y = ((miscounts_w_color$position_x + abs(min(miscounts_w_color$position_x))) * (100/(abs(min(miscounts_w_color$position_x)) + max(miscounts_w_color$position_x)))),
+         x = ((miscounts_w_color$position_y + abs(min(miscounts_w_color$position_y))) * (100/(abs(min(miscounts_w_color$position_y)) + max(miscounts_w_color$position_y)))),
          z=centroid_z)
   
 f2_zmatrix <- matrix(data = mean_z_f2, nrow=100, ncol = 100)
@@ -167,17 +165,18 @@ fig2_b1 <- plot_ly(scene="scene3") %>%
     add_surface(z=f2_zmatrix, colors = "plasma", opacity = 0.8, showscale = FALSE) %>%
     layout(showlegend=FALSE) %>%
     add_trace(type = "scatter3d", mode="markers",
-              data = figure2_belowmean, 
+              data = miscounts_w_color, 
               x=~x, y=~y, z = ~z,
-              marker = list(color = figure2_belowmean$colors,
-                            name = figure2_belowmean$height)
+              marker = list(color = miscounts_w_color$colors #,
+                            #name = figure2_belowmean$height
+                            )
               ) %>%
     layout(showlegend=FALSE,
       title = list(text = "Object quanitification using mean endothelial z-height", xanchor = 'center', yanchor = 'top'),
     scene3 = list(
-      xaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
-      yaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
-      zaxis = list(nticks = 10, titlefont=list(size=30), tickfont=list(size=15)),
+      xaxis = list(nticks = 10, titlefont=list(size=50), tickfont=list(size=20)),
+      yaxis = list(nticks = 10, titlefont=list(size=50), tickfont=list(size=20)),
+      zaxis = list(nticks = 10, titlefont=list(size=50), tickfont=list(size=20)),
       camera = list(eye = list(x = 0, y = -1, z = 0.5)), 
       aspectratio = list(x = 0.9, y = .8, z = 0.5))) 
 
@@ -194,21 +193,44 @@ axx <- list(
   showbackground=TRUE,
   backgroundcolor='white'
 )
- 
-fig <- fig %>% layout(title = "3D Subplots",
+
+annotations = list(
+  list(
+    x = 0.165, y=1,
+    text = "Object quanitification using mean endothelial z-height", xanchor = 'center', yanchor = 'top',
+    font = list(size=25),
+    showarrow = FALSE
+  ),
+  list(
+    x = 0.495, y=1,
+    text = "Object quanitification using flat plane", xanchor = 'center', yanchor = 'top',
+    font = list(size=25),
+     showarrow = FALSE
+  ),
+  list(
+    x = 0.83, y=1,
+    text = "Object quanitification using topographical surface", xanchor = 'center', yanchor = 'top',
+    font = list(size=25),
+     showarrow = FALSE
+  )
+)
+
+fig <- fig %>% layout(
+  title = " ",
          scene = list(domain=list(x=c(0.66,1),y=c(0,1)),
                       xaxis=axx, yaxis=axx, zaxis=axx,
                       aspectmode='cube'),
-         scene2 = list(domain=list(x=c(0.0,0.5),y=c(0,1)),
+         scene2 = list(domain=list(x=c(0.33,0.66),y=c(0,1)),
                        xaxis=axx, yaxis=axx, zaxis=axx,
                        aspectmode='cube'),
-         scene3 = list(domain=list(x=c(0,0.5),y=c(0.5,1)),
+         scene3 = list(domain=list(x=c(0,0.33),y=c(0,1)),
                        xaxis=axx, yaxis=axx, zaxis=axx,
-                       aspectmode='cube'))
+                       aspectmode='cube'),
+         annotations = annotations)
 
 fig
 
-#htmlwidgets::saveWidget(fig, file = "fig2_surface.html")
+htmlwidgets::saveWidget(fig, file = "fig2_surface_new.html")
 ```
 
 
